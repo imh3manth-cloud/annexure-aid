@@ -47,12 +47,19 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
           // Find transaction ID
           const txnId = row['Transaction ID'] || row['txn_id'] || row['tran_id'] || row['reference'] || '';
           
-          // Find amount
+          // Find amount - only process if it ends with 'D' (debit)
           let amountStr = row['Amt.'] || row['amount'] || row['withdrawal_amt'] || row['debit_amount'] || '0';
+          let isDebit = false;
           if (typeof amountStr === 'string') {
+            isDebit = amountStr.trim().toUpperCase().endsWith('D');
             amountStr = amountStr.replace(/[^\d.]/g, '');
           }
           const amount = parseFloat(amountStr) || 0;
+          
+          // Skip if not a debit transaction
+          if (!isDebit) {
+            return null;
+          }
           
           // Find particulars
           const particulars = row['Particulars'] || row['particulars'] || row['narration'] || '';
@@ -87,7 +94,7 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
           };
         });
         
-        resolve(transactions.filter(t => t.account && t.amount > 0));
+        resolve(transactions.filter(t => t && t.account && t.amount > 0));
       } catch (error) {
         reject(error);
       }
@@ -157,27 +164,27 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
 // Detect BO code from particulars
 export const detectBOCode = (particulars: string): { code: string; name: string } => {
   const boMap: Record<string, string> = {
-    '01': 'Chiduravalli BO',
-    '02': 'Doddebagilu BO',
-    '03': 'Horalahalli BO',
-    '04': 'Kolathur BO',
-    '05': 'Somanathapura BO',
-    '06': 'Ukkalagere BO',
-    '07': 'Vyasarajapura BO'
+    '1': 'Chiduravalli BO',
+    '2': 'Doddebagilu BO',
+    '3': 'Horalahalli BO',
+    '4': 'Kolathur BO',
+    '5': 'Somanathapura BO',
+    '6': 'Ukkalagere BO',
+    '7': 'Vyasarajapura BO'
   };
   
-  // Try 2-digit pattern first
-  const match2 = particulars.match(/BO(\d{2})/i);
-  if (match2) {
-    const code = match2[1];
-    return { code, name: boMap[code] || 'Unknown' };
-  }
-  
-  // Try 11-digit pattern and extract last 2 digits
+  // Try 11-digit pattern: BO21309111001 through BO21309111007
   const match11 = particulars.match(/BO(\d{11})/i);
   if (match11) {
     const fullCode = match11[1];
-    const code = fullCode.slice(-2);
+    const lastDigit = fullCode.slice(-1);
+    return { code: lastDigit, name: boMap[lastDigit] || 'Unknown' };
+  }
+  
+  // Fallback: try single digit after BO
+  const match1 = particulars.match(/BO[^\d]*([1-7])/i);
+  if (match1) {
+    const code = match1[1];
     return { code, name: boMap[code] || 'Unknown' };
   }
   
