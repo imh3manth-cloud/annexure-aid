@@ -35,6 +35,7 @@ const drawMemo = (
   const pageHeight = 297; // A4 height in mm
   const halfHeight = pageHeight / 2;
   const margin = 10;
+  const contentMargin = 3; // Internal margin within border
   const columnWidth = (pageWidth - 2 * margin) / 2;
   const middleX = margin + columnWidth;
   
@@ -43,95 +44,95 @@ const drawMemo = (
   doc.rect(margin, yOffset, pageWidth - 2 * margin, halfHeight - margin);
   doc.line(middleX, yOffset, middleX, yOffset + halfHeight - margin);
   
-  // Header - centered
+  // Header - centered (inside border with proper margin)
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('ANNEXURE-4', pageWidth / 2, yOffset + 8, { align: 'center' });
+  doc.text('ANNEXURE-4', pageWidth / 2, yOffset + contentMargin + 7, { align: 'center' });
   doc.setFontSize(10);
-  doc.text('[See para 105]', pageWidth / 2, yOffset + 13, { align: 'center' });
+  doc.text('[See para 105]', pageWidth / 2, yOffset + contentMargin + 12, { align: 'center' });
   
   // Left column - Memo of Verification
-  let leftY = yOffset + 22;
+  let leftY = yOffset + contentMargin + 20;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.text('Memo of Verification', margin + 3, leftY);
+  doc.text('Memo of Verification', margin + contentMargin, leftY);
   
   leftY += 6;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(
     `No: ${memo.serial} dated at ${OFFICE_NAME} the ${formatDate(memo.txn_date)}`,
-    margin + 3,
+    margin + contentMargin,
     leftY,
-    { maxWidth: columnWidth - 6 }
+    { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
   leftY += 10;
   const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} with ${OFFICE_NAME} on ${formatDate(memo.txn_date)}.`;
-  const bodyLines = doc.splitTextToSize(bodyText, columnWidth - 6);
-  doc.text(bodyLines, margin + 3, leftY);
+  const bodyLines = doc.splitTextToSize(bodyText, columnWidth - (contentMargin * 2));
+  doc.text(bodyLines, margin + contentMargin, leftY);
   leftY += bodyLines.length * 5;
   
   leftY += 5;
-  doc.text('The name and address of depositor are as below:', margin + 3, leftY);
+  doc.text('The name and address of depositor are as below:', margin + contentMargin, leftY);
   leftY += 5;
   
   // Name and address
   doc.setFont('helvetica', 'bold');
-  const nameLines = doc.splitTextToSize(memo.name, columnWidth - 6);
-  doc.text(nameLines, margin + 3, leftY);
+  const nameLines = doc.splitTextToSize(memo.name, columnWidth - (contentMargin * 2));
+  doc.text(nameLines, margin + contentMargin, leftY);
   leftY += nameLines.length * 4.5;
   
   doc.setFont('helvetica', 'normal');
-  const addressLines = doc.splitTextToSize(memo.address, columnWidth - 6);
-  doc.text(addressLines, margin + 3, leftY);
+  const addressLines = doc.splitTextToSize(memo.address, columnWidth - (contentMargin * 2));
+  doc.text(addressLines, margin + contentMargin, leftY);
   leftY += addressLines.length * 4.5;
   
   leftY += 8;
   const instructionText = 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.';
-  const instructionLines = doc.splitTextToSize(instructionText, columnWidth - 6);
-  doc.text(instructionLines, margin + 3, leftY);
+  const instructionLines = doc.splitTextToSize(instructionText, columnWidth - (contentMargin * 2));
+  doc.text(instructionLines, margin + contentMargin, leftY);
   leftY += instructionLines.length * 4.5;
   
   // Bottom left - To address
-  const bottomY = yOffset + halfHeight - margin - 28;
-  doc.text('To,', margin + 3, bottomY);
-  doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + 3, bottomY + 5);
-  doc.text(`T NARASIPURA SUB DIVISION  ${OFFICE_NAME}`, margin + 3, bottomY + 10);
+  const bottomY = yOffset + halfHeight - margin - 32;
+  doc.text('To,', margin + contentMargin, bottomY);
+  doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + contentMargin, bottomY + 5);
+  doc.text(`T NARASIPURA SUB DIVISION  ${OFFICE_NAME}`, margin + contentMargin, bottomY + 10);
   
   // Right column - Reply
-  let rightY = yOffset + 22;
+  let rightY = yOffset + contentMargin + 20;
   doc.setFont('helvetica', 'bold');
-  doc.text('Reply', middleX + 3, rightY);
+  doc.text('Reply', middleX + contentMargin, rightY);
   
   rightY += 6;
   doc.setFont('helvetica', 'normal');
   doc.text(
     `No: ${memo.serial} dated at ${OFFICE_NAME} the ${formatDate(memo.txn_date)}`,
-    middleX + 3,
+    middleX + contentMargin,
     rightY,
-    { maxWidth: columnWidth - 6 }
+    { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
   rightY += 10;
   const replyText = 'The result of verification of the withdrawal particularised in the margin has been found satisfactory/ not satisfactory.\n\nInvestigation has been taken up.';
-  const replyLines = doc.splitTextToSize(replyText, columnWidth - 6);
-  doc.text(replyLines, middleX + 3, rightY);
+  const replyLines = doc.splitTextToSize(replyText, columnWidth - (contentMargin * 2));
+  doc.text(replyLines, middleX + contentMargin, rightY);
   rightY += replyLines.length * 5;
   
   // Signature block - right aligned in right column
-  const sigY = yOffset + halfHeight - margin - 28;
+  const sigY = yOffset + halfHeight - margin - 32;
   doc.text('THE INSPECTOR OF POSTS', middleX + columnWidth - 55, sigY);
   doc.text('T NARASIPURA SUB DIVISION', middleX + columnWidth - 58, sigY + 5);
-  doc.text('To,', middleX + 3, sigY + 12);
-  doc.text('Sub Postmaster', middleX + 3, sigY + 17);
-  doc.text(OFFICE_NAME, middleX + 3, sigY + 22);
+  doc.text('To,', middleX + contentMargin, sigY + 12);
+  doc.text('Sub Postmaster', middleX + contentMargin, sigY + 17);
+  doc.text(OFFICE_NAME, middleX + contentMargin, sigY + 22);
   
-  // Footer note
+  // Footer note - with proper bottom margin
   doc.setFontSize(7);
   const noteText = 'Note: The verification memo should be returned to the HO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of P.R.I and within 30 days in all other cases.';
-  const noteLines = doc.splitTextToSize(noteText, pageWidth - 2 * margin - 4);
-  doc.text(noteLines, margin + 2, yOffset + halfHeight - margin - 7);
+  const noteLines = doc.splitTextToSize(noteText, pageWidth - 2 * margin - (contentMargin * 2));
+  doc.text(noteLines, margin + contentMargin, yOffset + halfHeight - margin - 10);
 };
 
 // Generate consolidated PDF for multiple memos
