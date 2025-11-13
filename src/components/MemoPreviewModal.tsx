@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { MemoRecord } from '@/lib/db';
 import { Download, Printer } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { getConfig } from '@/lib/config';
 
 interface MemoPreviewModalProps {
   open: boolean;
@@ -10,8 +11,6 @@ interface MemoPreviewModalProps {
   memos: MemoRecord[];
   onConfirm: () => void;
 }
-
-const OFFICE_NAME = 'OLD SOSALE S.O';
 
 const formatDate = (dateStr: string): string => {
   if (!dateStr) return '';
@@ -35,6 +34,8 @@ const formatAmount = (amount: number): string => {
 
 export const MemoPreviewModal = ({ open, onOpenChange, memos, onConfirm }: MemoPreviewModalProps) => {
   const previewRef = useRef<HTMLDivElement>(null);
+  const config = getConfig();
+  const OFFICE_NAME = config.officeName;
 
   useEffect(() => {
     if (open && previewRef.current) {

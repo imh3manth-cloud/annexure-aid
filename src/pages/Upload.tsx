@@ -39,17 +39,21 @@ export const Upload = () => {
         balanceRecords.push(...records);
       }
 
-      // Create account lookup
+      // Create account lookup with normalized account numbers
       const accountMap = new Map<string, LastBalanceRecord>();
       balanceRecords.forEach(rec => {
-        accountMap.set(rec.account, rec);
+        // Normalize account number by removing all non-numeric characters
+        const normalizedAccount = rec.account.replace(/\D/g, '');
+        accountMap.set(normalizedAccount, rec);
       });
 
       // Filter by threshold and merge data
       const candidates = transactions
         .filter(t => t.amount >= threshold)
         .map(t => {
-          const balanceData = accountMap.get(t.account);
+          // Normalize account number for lookup
+          const normalizedAccount = t.account.replace(/\D/g, '');
+          const balanceData = accountMap.get(normalizedAccount);
           const bo = detectBOCode(t.particulars);
           
           return {

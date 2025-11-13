@@ -41,8 +41,9 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
           // Find date column
           const txnDate = row['Transaction Date'] || row['transaction_date'] || row['txn_date'] || row['date'] || '';
           
-          // Find account column
-          const account = String(row['A/c. ID'] || row['a/c_id'] || row['ac_id'] || row['account_id'] || row['account_no'] || '').trim();
+          // Find account column - normalize to remove any non-numeric characters
+          const accountRaw = row['A/c. ID'] || row['a/c_id'] || row['ac_id'] || row['account_id'] || row['account_no'] || '';
+          const account = String(accountRaw).replace(/\D/g, '').trim();
           
           // Find transaction ID
           const txnId = row['Transaction ID'] || row['txn_id'] || row['tran_id'] || row['reference'] || '';
@@ -138,8 +139,8 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
             // Skip rows that don't have enough columns or look like headers
             if (!row || row.length < 10) continue;
             
-            // Account Number is typically at index 1
-            const account = String(row[1] || '').trim();
+            // Account Number is typically at index 1 - normalize to remove any non-numeric characters
+            const account = String(row[1] || '').replace(/\D/g, '').trim();
             
             // Skip if no account number or if it looks like a header/footer
             if (!account || account === '' || isNaN(Number(account))) continue;
@@ -179,32 +180,7 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
   });
 };
 
-// Detect BO code from particulars
-export const detectBOCode = (particulars: string): { code: string; name: string } => {
-  const boMap: Record<string, string> = {
-    '1': 'Chiduravalli BO',
-    '2': 'Doddebagilu BO',
-    '3': 'Horalahalli BO',
-    '4': 'Kolathur BO',
-    '5': 'Somanathapura BO',
-    '6': 'Ukkalagere BO',
-    '7': 'Vyasarajapura BO'
-  };
-  
-  // Try 11-digit pattern: BO21309111001 through BO21309111007
-  const match11 = particulars.match(/BO(\d{11})/i);
-  if (match11) {
-    const fullCode = match11[1];
-    const lastDigit = fullCode.slice(-1);
-    return { code: lastDigit, name: boMap[lastDigit] || 'Unknown' };
-  }
-  
-  // Fallback: try single digit after BO
-  const match1 = particulars.match(/BO[^\d]*([1-7])/i);
-  if (match1) {
-    const code = match1[1];
-    return { code, name: boMap[code] || 'Unknown' };
-  }
-  
-  return { code: 'Unknown', name: 'Unknown' };
-};
+// Detect BO code from particulars - now uses config
+import { detectBOFromConfig } from './config';
+
+export const detectBOCode = detectBOFromConfig;

@@ -10,6 +10,7 @@ import { MemoRegister } from "./pages/MemoRegister";
 import { VerifyReplies } from "./pages/VerifyReplies";
 import { Reminders } from "./pages/Reminders";
 import { Reports } from "./pages/Reports";
+import { Settings } from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { initSettings } from "./lib/db";
@@ -35,6 +36,7 @@ const App = () => {
               <Route path="/verify" element={<VerifyReplies />} />
               <Route path="/reminders" element={<Reminders />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Layout>

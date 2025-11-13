@@ -1,7 +1,6 @@
 import jsPDF from 'jspdf';
 import { MemoRecord } from './db';
-
-const OFFICE_NAME = 'OLD SOSALE S.O';
+import { getConfig } from './config';
 
 // Format date as DD/MM/YYYY
 const formatDate = (dateStr: string): string => {
@@ -31,6 +30,9 @@ const drawMemo = (
   memo: MemoRecord,
   yOffset: number
 ) => {
+  const config = getConfig();
+  const OFFICE_NAME = config.officeName;
+  const SUBDIVISION = config.subdivision;
   const pageWidth = 210; // A4 width in mm
   const pageHeight = 297; // A4 height in mm
   const halfHeight = pageHeight / 2;
@@ -45,15 +47,23 @@ const drawMemo = (
   doc.setLineWidth(0.5);
   doc.rect(margin, yOffset, pageWidth - 2 * margin, halfHeight - margin);
   
-  // Draw merged header box
-  doc.rect(margin, yOffset, pageWidth - 2 * margin, headerHeight);
+  // Draw split header boxes (left and right for tearing)
+  doc.rect(margin, yOffset, columnWidth, headerHeight);
+  doc.rect(middleX, yOffset, columnWidth, headerHeight);
   
-  // Header - centered (inside merged box)
+  // Header - split into left and right boxes
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('ANNEXURE-4', pageWidth / 2, yOffset + 5, { align: 'center' });
+  doc.text('ANNEXURE-4', margin + columnWidth / 2, yOffset + 5, { align: 'center' });
   doc.setFontSize(10);
-  doc.text('[See para 105]', pageWidth / 2, yOffset + 10, { align: 'center' });
+  doc.text('[See para 105]', margin + columnWidth / 2, yOffset + 10, { align: 'center' });
+  
+  // Right header (duplicate)
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('ANNEXURE-4', middleX + columnWidth / 2, yOffset + 5, { align: 'center' });
+  doc.setFontSize(10);
+  doc.text('[See para 105]', middleX + columnWidth / 2, yOffset + 10, { align: 'center' });
   
   // Draw vertical line separating left and right columns (starting after header)
   doc.line(middleX, yOffset + headerHeight, middleX, yOffset + halfHeight - margin - footerHeight);
@@ -105,7 +115,7 @@ const drawMemo = (
   const bottomY = yOffset + halfHeight - margin - footerHeight - 25;
   doc.text('To,', margin + contentMargin, bottomY);
   doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + contentMargin, bottomY + 5);
-  doc.text(`T NARASIPURA SUB DIVISION  ${OFFICE_NAME}`, margin + contentMargin, bottomY + 10);
+  doc.text(`${SUBDIVISION}  ${OFFICE_NAME}`, margin + contentMargin, bottomY + 10);
   
   // Right column - Reply (starting after header box)
   let rightY = yOffset + headerHeight + 5;
@@ -130,24 +140,28 @@ const drawMemo = (
   // Signature block - right aligned in right column (positioned above footer box)
   const sigY = yOffset + halfHeight - margin - footerHeight - 25;
   doc.text('THE INSPECTOR OF POSTS', middleX + columnWidth - 55, sigY);
-  doc.text('T NARASIPURA SUB DIVISION', middleX + columnWidth - 58, sigY + 5);
+  doc.text(SUBDIVISION, middleX + columnWidth - 58, sigY + 5);
   doc.text('To,', middleX + contentMargin, sigY + 12);
   doc.text('Sub Postmaster', middleX + contentMargin, sigY + 17);
   doc.text(OFFICE_NAME, middleX + contentMargin, sigY + 22);
   
-  // Draw merged footer box
+  // Draw split footer boxes (left and right for tearing)
   const footerY = yOffset + halfHeight - margin - footerHeight;
-  doc.rect(margin, footerY, pageWidth - 2 * margin, footerHeight);
+  doc.rect(margin, footerY, columnWidth, footerHeight);
+  doc.rect(middleX, footerY, columnWidth, footerHeight);
   
-  // Footer note - centered in merged box
+  // Footer note - split into left and right boxes
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   const noteText = 'Note: The verification memo should be returned to the HO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of P.R.I and within 30 days in all other cases.';
-  const noteLines = doc.splitTextToSize(noteText, pageWidth - 2 * margin - (contentMargin * 2));
+  const noteLines = doc.splitTextToSize(noteText, columnWidth - (contentMargin * 2));
   doc.text(noteLines, margin + contentMargin, footerY + 4);
+  
+  // Right footer (duplicate)
+  doc.text(noteLines, middleX + contentMargin, footerY + 4);
 };
 
-// Generate consolidated PDF for multiple memos
+// Generate consolidated PDF for multiple memos with summary report
 export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -171,6 +185,77 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
     
     pageCount++;
   }
+  
+  // Add consolidated summary report at the end
+  doc.addPage();
+  
+  doc.setFontSize(16);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Consolidated Memo Report', 105, 20, { align: 'center' });
+  
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Date: ${formatDate(new Date().toISOString())}`, 15, 35);
+  doc.text(`Total Memos: ${memos.length}`, 15, 45);
+  
+  // Calculate total amount
+  const totalAmount = memos.reduce((sum, memo) => sum + memo.amount, 0);
+  doc.text(`Total Amount: Rs ${formatAmount(totalAmount)}`, 15, 55);
+  
+  // Group by BO
+  const boGroups = memos.reduce((acc, memo) => {
+    if (!acc[memo.BO_Name]) {
+      acc[memo.BO_Name] = { count: 0, amount: 0 };
+    }
+    acc[memo.BO_Name].count++;
+    acc[memo.BO_Name].amount += memo.amount;
+    return acc;
+  }, {} as Record<string, { count: number; amount: number }>);
+  
+  let yPos = 70;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Branch Office Summary:', 15, yPos);
+  yPos += 10;
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  Object.entries(boGroups).forEach(([boName, data]) => {
+    doc.text(`${boName}: ${data.count} memos, Rs ${formatAmount(data.amount)}`, 20, yPos);
+    yPos += 8;
+  });
+  
+  // Memo list
+  yPos += 10;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Memo Details:', 15, yPos);
+  yPos += 10;
+  
+  // Table header
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text('S.No', 15, yPos);
+  doc.text('Account No', 35, yPos);
+  doc.text('Amount', 75, yPos);
+  doc.text('Date', 105, yPos);
+  doc.text('Branch Office', 135, yPos);
+  yPos += 6;
+  
+  doc.setFont('helvetica', 'normal');
+  memos.forEach((memo, idx) => {
+    if (yPos > 270) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    doc.text(String(memo.serial), 15, yPos);
+    doc.text(memo.account, 35, yPos);
+    doc.text(formatAmount(memo.amount), 75, yPos);
+    doc.text(formatDate(memo.txn_date), 105, yPos);
+    doc.text(memo.BO_Name, 135, yPos, { maxWidth: 60 });
+    yPos += 6;
+  });
   
   return doc;
 };

@@ -1,11 +1,19 @@
 import { NavLink } from './NavLink';
-import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3 } from 'lucide-react';
+import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getConfig } from '@/lib/config';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 export const Layout = ({ children }: LayoutProps) => {
+  const [subdivision, setSubdivision] = useState('T NARASIPURA SUB DIVISION');
+
+  useEffect(() => {
+    const config = getConfig();
+    setSubdivision(config.subdivision);
+  }, []);
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -21,7 +29,7 @@ export const Layout = ({ children }: LayoutProps) => {
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              T. Narasipura Sub Division
+              {subdivision}
             </div>
           </div>
         </div>
@@ -82,6 +90,15 @@ export const Layout = ({ children }: LayoutProps) => {
             >
               <BarChart3 className="w-4 h-4" />
               <span>Reports</span>
+            </NavLink>
+            
+            <NavLink
+              to="/settings"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
+              activeClassName="text-foreground bg-background border-b-2 border-primary"
+            >
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
             </NavLink>
           </nav>
         </div>
