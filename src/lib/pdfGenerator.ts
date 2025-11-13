@@ -38,21 +38,28 @@ const drawMemo = (
   const contentMargin = 3; // Internal margin within border
   const columnWidth = (pageWidth - 2 * margin) / 2;
   const middleX = margin + columnWidth;
+  const headerHeight = 12; // Height for header box
+  const footerHeight = 12; // Height for footer box
   
-  // Draw border for this memo half
+  // Draw main border for this memo half
   doc.setLineWidth(0.5);
   doc.rect(margin, yOffset, pageWidth - 2 * margin, halfHeight - margin);
-  doc.line(middleX, yOffset, middleX, yOffset + halfHeight - margin);
   
-  // Header - centered (inside border with proper margin)
+  // Draw merged header box
+  doc.rect(margin, yOffset, pageWidth - 2 * margin, headerHeight);
+  
+  // Header - centered (inside merged box)
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('ANNEXURE-4', pageWidth / 2, yOffset + contentMargin + 7, { align: 'center' });
+  doc.text('ANNEXURE-4', pageWidth / 2, yOffset + 5, { align: 'center' });
   doc.setFontSize(10);
-  doc.text('[See para 105]', pageWidth / 2, yOffset + contentMargin + 12, { align: 'center' });
+  doc.text('[See para 105]', pageWidth / 2, yOffset + 10, { align: 'center' });
   
-  // Left column - Memo of Verification
-  let leftY = yOffset + contentMargin + 20;
+  // Draw vertical line separating left and right columns (starting after header)
+  doc.line(middleX, yOffset + headerHeight, middleX, yOffset + halfHeight - margin - footerHeight);
+  
+  // Left column - Memo of Verification (starting after header box)
+  let leftY = yOffset + headerHeight + 5;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Memo of Verification', margin + contentMargin, leftY);
@@ -94,14 +101,14 @@ const drawMemo = (
   doc.text(instructionLines, margin + contentMargin, leftY);
   leftY += instructionLines.length * 4.5;
   
-  // Bottom left - To address
-  const bottomY = yOffset + halfHeight - margin - 32;
+  // Bottom left - To address (positioned above footer box)
+  const bottomY = yOffset + halfHeight - margin - footerHeight - 25;
   doc.text('To,', margin + contentMargin, bottomY);
   doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + contentMargin, bottomY + 5);
   doc.text(`T NARASIPURA SUB DIVISION  ${OFFICE_NAME}`, margin + contentMargin, bottomY + 10);
   
-  // Right column - Reply
-  let rightY = yOffset + contentMargin + 20;
+  // Right column - Reply (starting after header box)
+  let rightY = yOffset + headerHeight + 5;
   doc.setFont('helvetica', 'bold');
   doc.text('Reply', middleX + contentMargin, rightY);
   
@@ -120,19 +127,24 @@ const drawMemo = (
   doc.text(replyLines, middleX + contentMargin, rightY);
   rightY += replyLines.length * 5;
   
-  // Signature block - right aligned in right column
-  const sigY = yOffset + halfHeight - margin - 32;
+  // Signature block - right aligned in right column (positioned above footer box)
+  const sigY = yOffset + halfHeight - margin - footerHeight - 25;
   doc.text('THE INSPECTOR OF POSTS', middleX + columnWidth - 55, sigY);
   doc.text('T NARASIPURA SUB DIVISION', middleX + columnWidth - 58, sigY + 5);
   doc.text('To,', middleX + contentMargin, sigY + 12);
   doc.text('Sub Postmaster', middleX + contentMargin, sigY + 17);
   doc.text(OFFICE_NAME, middleX + contentMargin, sigY + 22);
   
-  // Footer note - with proper bottom margin
+  // Draw merged footer box
+  const footerY = yOffset + halfHeight - margin - footerHeight;
+  doc.rect(margin, footerY, pageWidth - 2 * margin, footerHeight);
+  
+  // Footer note - centered in merged box
   doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
   const noteText = 'Note: The verification memo should be returned to the HO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of P.R.I and within 30 days in all other cases.';
   const noteLines = doc.splitTextToSize(noteText, pageWidth - 2 * margin - (contentMargin * 2));
-  doc.text(noteLines, margin + contentMargin, yOffset + halfHeight - margin - 10);
+  doc.text(noteLines, margin + contentMargin, footerY + 4);
 };
 
 // Generate consolidated PDF for multiple memos

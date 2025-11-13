@@ -7,12 +7,14 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Eye } from 'lucide-react';
+import { MemoPreviewModal } from '@/components/MemoPreviewModal';
 
 export const MemoRegister = () => {
   const [memos, setMemos] = useState<MemoRecord[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<'all' | 'New' | 'Pending' | 'Verified' | 'Reported'>('all');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -42,12 +44,17 @@ export const MemoRegister = () => {
     }
   };
 
-  const handleGeneratePDF = async () => {
+  const handlePreview = () => {
     const selectedMemos = memos.filter(m => selected.has(m.id!));
     if (selectedMemos.length === 0) {
       toast({ title: 'No memos selected', variant: 'destructive' });
       return;
     }
+    setPreviewOpen(true);
+  };
+
+  const handleGeneratePDF = async () => {
+    const selectedMemos = memos.filter(m => selected.has(m.id!));
 
     try {
       const pdf = generateConsolidatedPDF(selectedMemos);
@@ -64,6 +71,7 @@ export const MemoRegister = () => {
       }
 
       toast({ title: 'PDF generated successfully' });
+      setPreviewOpen(false);
       setSelected(new Set());
       loadMemos();
     } catch (error: any) {
@@ -93,9 +101,16 @@ export const MemoRegister = () => {
   };
 
   const filteredMemos = filter === 'all' ? memos : memos.filter(m => m.status === filter);
+  const selectedMemos = memos.filter(m => selected.has(m.id!));
 
   return (
     <div className="space-y-6">
+      <MemoPreviewModal
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        memos={selectedMemos}
+        onConfirm={handleGeneratePDF}
+      />
       <div className="flex justify-between items-start">
         <div>
           <h2 className="text-3xl font-bold text-foreground">Memo Register</h2>
@@ -104,9 +119,9 @@ export const MemoRegister = () => {
         
         <div className="flex gap-2">
           {selected.size > 0 && (
-            <Button onClick={handleGeneratePDF} size="sm">
-              <FileText className="w-4 h-4 mr-2" />
-              Generate PDF ({selected.size})
+            <Button onClick={handlePreview} size="sm">
+              <Eye className="w-4 h-4 mr-2" />
+              Preview & Generate PDF ({selected.size})
             </Button>
           )}
         </div>
