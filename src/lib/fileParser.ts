@@ -109,44 +109,62 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
 export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: true,
+      header: false, // Parse without headers to handle complex structure
       skipEmptyLines: true,
       complete: (results) => {
         try {
           const records: LastBalanceRecord[] = [];
+          const rows = results.data as any[][];
           
-          for (const row of results.data as any[]) {
-            // Find account number
-            const account = String(
-              row['Account Number'] ||
-              row['account_number'] ||
-              row['ac_no'] ||
-              row['a/c_id'] ||
-              ''
-            ).trim();
+          // Find the header row (contains "Account Number")
+          let headerRowIndex = -1;
+          for (let i = 0; i < Math.min(20, rows.length); i++) {
+            const row = rows[i];
+            if (row.some((cell: any) => String(cell).includes('Account Number'))) {
+              headerRowIndex = i;
+              break;
+            }
+          }
+          
+          if (headerRowIndex === -1) {
+            reject(new Error('Could not find header row in CSV'));
+            return;
+          }
+          
+          // Parse data rows after header
+          for (let i = headerRowIndex + 1; i < rows.length; i++) {
+            const row = rows[i];
             
-            // Find name (prefer Cust1 Name)
-            let name = row['Cust1 Name'] || row['cust1_name'] || row['depositor_name'] || 
-                       row['customer_name'] || row['name'] || '';
+            // Skip rows that don't have enough columns or look like headers
+            if (!row || row.length < 10) continue;
             
-            // Check for Cust2 Name and concatenate if exists
-            const name2 = row['Cust2 Name'] || row['cust2_name'] || '';
-            if (name2 && name2.trim() && name2.trim() !== ',') {
+            // Account Number is typically at index 1
+            const account = String(row[1] || '').trim();
+            
+            // Skip if no account number or if it looks like a header/footer
+            if (!account || account === '' || isNaN(Number(account))) continue;
+            
+            // Cust1 Name is typically at index 3
+            let name = String(row[3] || '').trim();
+            
+            // Cust2 Name is typically at index 7
+            const name2 = String(row[7] || '').trim();
+            if (name2 && name2 !== ',' && name2 !== ' ') {
               name = `${name} ${name2}`.trim();
             }
             
-            // Find address
-            const address = row['Address'] || row['address'] || row['full_address'] || '';
+            // Address is typically around index 12 (may contain commas)
+            let address = String(row[12] || '').trim();
             
-            // Find BO Name
-            const boName = row['BO Name'] || row['bo_name'] || row['branch'] || '';
+            // BO Name is typically the last column
+            const boName = String(row[row.length - 1] || '').trim();
             
             if (account && name) {
               records.push({
                 account,
-                name: String(name).trim(),
-                address: String(address).trim(),
-                bo_name: String(boName).trim()
+                name,
+                address,
+                bo_name: boName
               });
             }
           }
