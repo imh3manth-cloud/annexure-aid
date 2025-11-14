@@ -29,13 +29,13 @@ export const getConfig = (): AppConfig => {
 export const detectBOFromConfig = (particulars: string): { code: string; name: string } => {
   const config = getConfig();
   
-  // Try 11-digit pattern: BO21309111001 through BO21309111007
+  // Try full BO code pattern: BO21309111001 through BO21309111007
   const match11 = particulars.match(/BO(\d{11})/i);
   if (match11) {
-    const fullCode = match11[1];
-    const lastDigit = fullCode.slice(-1);
+    const fullCode = `BO${match11[1]}`;
+    const lastDigit = match11[1].slice(-1);
     return { 
-      code: lastDigit, 
+      code: fullCode, // Return full BO code like BO21309111001
       name: config.boMappings[lastDigit] || 'Unknown' 
     };
   }
@@ -45,10 +45,10 @@ export const detectBOFromConfig = (particulars: string): { code: string; name: s
   if (match1) {
     const code = match1[1];
     return { 
-      code, 
+      code: `BO2130911100${code}`, // Generate full BO code
       name: config.boMappings[code] || 'Unknown' 
     };
   }
   
-  return { code: 'Unknown', name: 'Unknown' };
+  return { code: 'BO_UNKNOWN', name: 'Unknown' };
 };
