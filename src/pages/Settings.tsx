@@ -50,7 +50,7 @@ export const Settings = () => {
 
   const formatBOMappings = (mappings: Record<string, string>) => {
     return Object.entries(mappings)
-      .map(([code, name]) => `${code}=${name}`)
+      .map(([code, name]) => `BO2130911100${code}=${name}`)
       .join('\n');
   };
 
@@ -59,7 +59,10 @@ export const Settings = () => {
     text.split('\n').forEach(line => {
       const [code, name] = line.split('=').map(s => s.trim());
       if (code && name) {
-        mappings[code] = name;
+        // Extract just the last digit if full BO code provided (e.g., BO21309111001 -> 1)
+        const match = code.match(/BO\d+(\d)$/);
+        const key = match ? match[1] : code;
+        mappings[key] = name;
       }
     });
     return mappings;
@@ -187,14 +190,15 @@ export const Settings = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="boMappings">Branch Office Mappings</Label>
-            <p className="text-sm text-muted-foreground">Enter one mapping per line in format: code=name</p>
+            <Label htmlFor="boMappings">Branch Office Code Mappings</Label>
+            <p className="text-sm text-muted-foreground">
+              Enter one mapping per line in format: BO21309111001=Branch Name
+            </p>
             <Textarea
               id="boMappings"
               value={boMappingsText}
               onChange={(e) => setBoMappingsText(e.target.value)}
-              placeholder="1=Chiduravalli BO&#10;2=Doddebagilu BO&#10;3=Horalahalli BO"
-              rows={8}
+              rows={10}
               className="font-mono text-sm"
             />
           </div>

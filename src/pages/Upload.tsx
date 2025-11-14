@@ -39,11 +39,14 @@ export const Upload = () => {
         balanceRecords.push(...records);
       }
 
-      // Create account lookup with normalized account numbers
+      // Create account lookup with normalized account numbers (remove leading zeros)
       const accountMap = new Map<string, LastBalanceRecord>();
       balanceRecords.forEach(rec => {
-        // Normalize account number by removing all non-numeric characters
-        const normalizedAccount = rec.account.replace(/\D/g, '');
+        // Normalize account number by removing all non-numeric characters and leading zeros
+        let normalizedAccount = rec.account.replace(/\D/g, '');
+        if (normalizedAccount && !isNaN(Number(normalizedAccount))) {
+          normalizedAccount = String(Number(normalizedAccount));
+        }
         accountMap.set(normalizedAccount, rec);
       });
 
@@ -51,8 +54,11 @@ export const Upload = () => {
       const candidates = transactions
         .filter(t => t.amount >= threshold)
         .map(t => {
-          // Normalize account number for lookup
-          const normalizedAccount = t.account.replace(/\D/g, '');
+          // Normalize account number for lookup (remove leading zeros)
+          let normalizedAccount = t.account.replace(/\D/g, '');
+          if (normalizedAccount && !isNaN(Number(normalizedAccount))) {
+            normalizedAccount = String(Number(normalizedAccount));
+          }
           const balanceData = accountMap.get(normalizedAccount);
           const bo = detectBOCode(t.particulars);
           

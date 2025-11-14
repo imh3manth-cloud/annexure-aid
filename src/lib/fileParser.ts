@@ -41,9 +41,13 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
           // Find date column
           const txnDate = row['Transaction Date'] || row['transaction_date'] || row['txn_date'] || row['date'] || '';
           
-          // Find account column - normalize to remove any non-numeric characters and leading zeros
+          // Find account column - normalize by removing non-numeric chars and leading zeros
           const accountRaw = row['A/c. ID'] || row['a/c_id'] || row['ac_id'] || row['account_id'] || row['account_no'] || '';
-          const account = String(accountRaw).replace(/\D/g, '').trim();
+          let account = String(accountRaw).replace(/\D/g, '').trim();
+          // Remove leading zeros by converting to number and back to string
+          if (account && !isNaN(Number(account))) {
+            account = String(Number(account));
+          }
           
           console.log('HFTI - Raw:', accountRaw, 'Normalized:', account);
           
@@ -144,8 +148,12 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
           // Account Number is typically at index 1
           // Store the raw account number and normalize it for matching
           const accountRaw = String(row[1] || '').trim();
-          // Remove all non-numeric characters for normalization
-          const account = accountRaw.replace(/\D/g, '').trim();
+          // Remove all non-numeric characters and leading zeros
+          let account = accountRaw.replace(/\D/g, '').trim();
+          // Remove leading zeros by converting to number and back to string
+          if (account && !isNaN(Number(account))) {
+            account = String(Number(account));
+          }
           
           // Skip if no account number or if it looks like a header/footer
           if (!account || account === '' || isNaN(Number(account))) continue;

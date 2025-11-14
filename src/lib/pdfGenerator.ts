@@ -189,42 +189,99 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   // Add consolidated summary report at the end
   doc.addPage();
   
-  // India Post Logo (converted to base64 will be added in component)
-  const logoData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='; // Placeholder
-  
   // Header with India Post branding
   doc.setFontSize(18);
   doc.setFont('helvetica', 'bold');
-  doc.text('DEPARTMENT OF POSTS', 105, 25, { align: 'center' });
+  doc.text('DEPARTMENT OF POSTS', 105, 20, { align: 'center' });
   doc.setFontSize(14);
-  doc.text('INDIA POST', 105, 32, { align: 'center' });
+  doc.text('INDIA POST', 105, 27, { align: 'center' });
   
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('Consolidated Memo Report', 105, 45, { align: 'center' });
+  doc.text('Consolidated Memo Report', 105, 40, { align: 'center' });
   
   const config = getConfig();
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Office: ${config.officeName}`, 105, 53, { align: 'center' });
-  doc.text(`Subdivision: ${config.subdivision}`, 105, 60, { align: 'center' });
+  doc.text(`Office: ${config.officeName}`, 105, 48, { align: 'center' });
+  doc.text(`Subdivision: ${config.subdivision}`, 105, 55, { align: 'center' });
   
   // Summary section
   doc.setFontSize(10);
-  doc.text(`Report Date: ${formatDate(new Date().toISOString())}`, 15, 75);
-  doc.text(`Total Memos: ${memos.length}`, 15, 82);
+  doc.text(`Report Date: ${formatDate(new Date().toISOString())}`, 15, 68);
+  doc.text(`Total Memos: ${memos.length}`, 15, 75);
   
   const totalAmount = memos.reduce((sum, memo) => sum + memo.amount, 0);
-  doc.text(`Total Amount: Rs ${formatAmount(totalAmount)}`, 15, 89);
+  doc.text(`Total Amount: Rs ${formatAmount(totalAmount)}`, 15, 82);
   
-  // Sort memos by serial number in ascending order for consolidated report
+  // Branch Office Summary - First on page with proper spacing
+  let yPos = 95;
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Branch Office Summary', 15, yPos);
+  yPos += 10;
+  
+  const boGroups = memos.reduce((acc, memo) => {
+    const key = `${memo.BO_Code} - ${memo.BO_Name}`;
+    if (!acc[key]) {
+      acc[key] = { count: 0, amount: 0 };
+    }
+    acc[key].count++;
+    acc[key].amount += memo.amount;
+    return acc;
+  }, {} as Record<string, { count: number; amount: number }>);
+  
+  // Draw BO summary table with borders
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  const summaryX = [15, 80, 130, 165];
+  
+  // Header
+  doc.setFillColor(230, 230, 230);
+  doc.rect(summaryX[0], yPos - 5, 180, 7, 'F');
+  doc.text('Branch Office Code', summaryX[0] + 2, yPos);
+  doc.text('Branch Office Name', summaryX[1] + 2, yPos);
+  doc.text('Memos', summaryX[2] + 2, yPos);
+  doc.text('Amount (Rs)', summaryX[3] + 2, yPos);
+  doc.rect(summaryX[0], yPos - 5, 180, 7);
+  yPos += 7;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  Object.entries(boGroups).sort().forEach(([boKey, data], idx) => {
+    const [code, name] = boKey.split(' - ');
+    
+    if (idx % 2 === 0) {
+      doc.setFillColor(245, 245, 245);
+      doc.rect(summaryX[0], yPos - 5, 180, 7, 'F');
+    }
+    
+    doc.text(code, summaryX[0] + 2, yPos);
+    doc.text(name.substring(0, 25), summaryX[1] + 2, yPos);
+    doc.text(String(data.count), summaryX[2] + 2, yPos);
+    doc.text(formatAmount(data.amount), summaryX[3] + 2, yPos, { align: 'right' });
+    
+    doc.setLineWidth(0.3);
+    doc.rect(summaryX[0], yPos - 5, 180, 7);
+    yPos += 7;
+  });
+  
+  // Sort memos by serial number in ascending order
   const sortedMemos = [...memos].sort((a, b) => a.serial - b.serial);
   
-  // Table with proper borders
-  let yPos = 105;
-  const tableStartY = yPos;
-  const colX = [15, 35, 70, 100, 135, 170];
-  const colWidths = [20, 35, 30, 35, 35, 25];
+  // Memo details table
+  yPos += 15;
+  if (yPos > 250) {
+    doc.addPage();
+    yPos = 20;
+  }
+  
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Memo Details', 15, yPos);
+  yPos += 10;
+  
+  const colX = [15, 35, 75, 115, 150];
   const rowHeight = 7;
   
   // Draw table header
@@ -234,16 +291,13 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.text('Sl.No', colX[0] + 2, yPos);
-  doc.text('Account No', colX[1] + 2, yPos);
+  doc.text('Account Number', colX[1] + 2, yPos);
   doc.text('Amount (Rs)', colX[2] + 2, yPos);
   doc.text('Date', colX[3] + 2, yPos);
   doc.text('Branch Office', colX[4] + 2, yPos);
-  doc.text('BO Code', colX[5] + 2, yPos);
   
-  // Draw header border
   doc.setLineWidth(0.5);
   doc.rect(colX[0], yPos - 5, 180, rowHeight);
-  
   yPos += rowHeight;
   
   // Draw table rows
@@ -255,17 +309,16 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
       doc.addPage();
       yPos = 20;
       
-      // Redraw header on new page
+      // Redraw header
       doc.setFillColor(230, 230, 230);
       doc.rect(colX[0], yPos - 5, 180, rowHeight, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.text('Sl.No', colX[0] + 2, yPos);
-      doc.text('Account No', colX[1] + 2, yPos);
+      doc.text('Account Number', colX[1] + 2, yPos);
       doc.text('Amount (Rs)', colX[2] + 2, yPos);
       doc.text('Date', colX[3] + 2, yPos);
       doc.text('Branch Office', colX[4] + 2, yPos);
-      doc.text('BO Code', colX[5] + 2, yPos);
       doc.rect(colX[0], yPos - 5, 180, rowHeight);
       yPos += rowHeight;
       doc.setFont('helvetica', 'normal');
@@ -278,49 +331,21 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
       doc.rect(colX[0], yPos - 5, 180, rowHeight, 'F');
     }
     
-    doc.text(String(memo.serial), colX[0] + 2, yPos);
-    doc.text(memo.account.substring(0, 14), colX[1] + 2, yPos);
-    doc.text(formatAmount(memo.amount), colX[2] + 2, yPos);
+    // Right-aligned serial number
+    doc.text(String(memo.serial), colX[0] + 18, yPos, { align: 'right' });
+    doc.text(memo.account.substring(0, 16), colX[1] + 2, yPos);
+    doc.text(formatAmount(memo.amount), colX[2] + 38, yPos, { align: 'right' });
     doc.text(formatDate(memo.txn_date), colX[3] + 2, yPos);
     
     // Truncate BO name if too long
-    const boName = memo.BO_Name.length > 18 ? memo.BO_Name.substring(0, 15) + '...' : memo.BO_Name;
+    const boName = memo.BO_Name.length > 22 ? memo.BO_Name.substring(0, 19) + '...' : memo.BO_Name;
     doc.text(boName, colX[4] + 2, yPos);
-    doc.text(memo.BO_Code, colX[5] + 2, yPos);
     
     // Draw row border
     doc.setLineWidth(0.3);
     doc.rect(colX[0], yPos - 5, 180, rowHeight);
     
     yPos += rowHeight;
-  });
-  
-  // Group by BO summary at bottom
-  yPos += 10;
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Branch Office Summary:', 15, yPos);
-  yPos += 8;
-  
-  const boGroups = memos.reduce((acc, memo) => {
-    const key = `${memo.BO_Code} - ${memo.BO_Name}`;
-    if (!acc[key]) {
-      acc[key] = { count: 0, amount: 0 };
-    }
-    acc[key].count++;
-    acc[key].amount += memo.amount;
-    return acc;
-  }, {} as Record<string, { count: number; amount: number }>);
-  
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  Object.entries(boGroups).sort().forEach(([boKey, data]) => {
-    if (yPos > 280) {
-      doc.addPage();
-      yPos = 20;
-    }
-    doc.text(`${boKey}: ${data.count} memos, Rs ${formatAmount(data.amount)}`, 20, yPos);
-    yPos += 6;
   });
   
   return doc;
