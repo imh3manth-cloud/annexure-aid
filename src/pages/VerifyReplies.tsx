@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, Search } from 'lucide-react';
 
 export const VerifyReplies = () => {
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
+  const [filteredMemos, setFilteredMemos] = useState<MemoRecord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const [verificationDate, setVerificationDate] = useState(new Date().toISOString().split('T')[0]);
   const [formData, setFormData] = useState({
     name: '',
@@ -24,15 +26,31 @@ export const VerifyReplies = () => {
   }, []);
 
   useEffect(() => {
-    if (pendingMemos.length > 0 && currentIndex < pendingMemos.length) {
-      const memo = pendingMemos[currentIndex];
+    if (pendingMemos.length > 0 && currentIndex < filteredMemos.length) {
+      const memo = filteredMemos[currentIndex];
       setFormData({
         name: memo.name,
         address: memo.address,
         remarks: memo.remarks
       });
     }
-  }, [currentIndex, pendingMemos]);
+  }, [currentIndex, filteredMemos, pendingMemos]);
+
+  useEffect(() => {
+    // Filter memos based on search query
+    if (searchQuery.trim() === '') {
+      setFilteredMemos(pendingMemos);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = pendingMemos.filter(memo => 
+        String(memo.serial).includes(query) ||
+        memo.account.toLowerCase().includes(query) ||
+        memo.name.toLowerCase().includes(query)
+      );
+      setFilteredMemos(filtered);
+      setCurrentIndex(0);
+    }
+  }, [searchQuery, pendingMemos]);
 
   const loadPendingMemos = async () => {
     const memos = await db.memos
@@ -40,10 +58,11 @@ export const VerifyReplies = () => {
       .equals('Pending')
       .sortBy('BO_Code');
     setPendingMemos(memos);
+    setFilteredMemos(memos);
     setCurrentIndex(0);
   };
 
-  const currentMemo = pendingMemos[currentIndex];
+  const currentMemo = filteredMemos[currentIndex];
 
   const handleVerified = async () => {
     if (!currentMemo) return;
@@ -60,7 +79,7 @@ export const VerifyReplies = () => {
       toast({ title: 'Marked as Verified' });
       
       // Move to next
-      if (currentIndex < pendingMemos.length - 1) {
+      if (currentIndex < filteredMemos.length - 1) {
         setCurrentIndex(currentIndex + 1);
       } else {
         loadPendingMemos();
@@ -85,7 +104,7 @@ export const VerifyReplies = () => {
       toast({ title: 'Marked as Reported', variant: 'destructive' });
       
       // Move to next
-      if (currentIndex < pendingMemos.length - 1) {
+      if (currentIndex < filteredMemos.length - 1) {
         setCurrentIndex(currentIndex + 1);
       } else {
         loadPendingMemos();
@@ -117,20 +136,32 @@ export const VerifyReplies = () => {
         <div>
           <h2 className="text-3xl font-bold text-foreground">Verify Replies</h2>
           <p className="text-muted-foreground mt-1">
-            Processing memo {currentIndex + 1} of {pendingMemos.length}
+            Processing memo {currentIndex + 1} of {filteredMemos.length}
+            {searchQuery && ` (filtered from ${pendingMemos.length})`}
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
-        {/* Left: Pending memos list */}
+        {/* Left: Pending memos list with search */}
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle className="text-sm">Pending Memos</CardTitle>
+            <div className="mt-2">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search memo # or account..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
-              {pendingMemos.map((memo, idx) => (
+              {filteredMemos.map((memo, idx) => (
                 <button
                   key={memo.id}
                   onClick={() => setCurrentIndex(idx)}

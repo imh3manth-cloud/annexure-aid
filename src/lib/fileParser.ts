@@ -41,9 +41,11 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
           // Find date column
           const txnDate = row['Transaction Date'] || row['transaction_date'] || row['txn_date'] || row['date'] || '';
           
-          // Find account column - normalize to remove any non-numeric characters
+          // Find account column - normalize to remove any non-numeric characters and leading zeros
           const accountRaw = row['A/c. ID'] || row['a/c_id'] || row['ac_id'] || row['account_id'] || row['account_no'] || '';
           const account = String(accountRaw).replace(/\D/g, '').trim();
+          
+          console.log('HFTI - Raw:', accountRaw, 'Normalized:', account);
           
           // Find transaction ID
           const txnId = row['Transaction ID'] || row['txn_id'] || row['tran_id'] || row['reference'] || '';
@@ -139,11 +141,16 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
             // Skip rows that don't have enough columns or look like headers
             if (!row || row.length < 10) continue;
             
-            // Account Number is typically at index 1 - normalize to remove any non-numeric characters
-            const account = String(row[1] || '').replace(/\D/g, '').trim();
-            
-            // Skip if no account number or if it looks like a header/footer
-            if (!account || account === '' || isNaN(Number(account))) continue;
+          // Account Number is typically at index 1
+          // Store the raw account number and normalize it for matching
+          const accountRaw = String(row[1] || '').trim();
+          // Remove all non-numeric characters for normalization
+          const account = accountRaw.replace(/\D/g, '').trim();
+          
+          // Skip if no account number or if it looks like a header/footer
+          if (!account || account === '' || isNaN(Number(account))) continue;
+          
+          console.log('Last Balance CSV - Raw:', accountRaw, 'Normalized:', account);
             
             // Cust1 Name is typically at index 3
             let name = String(row[3] || '').trim();
