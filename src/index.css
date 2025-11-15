@@ -45,19 +45,12 @@ All colors MUST be HSL.
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
@@ -104,6 +97,44 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  .glass {
+    --background: 220 15% 95%;
+    --foreground: 220 10% 10%;
+
+    --card: 0 0% 100% / 0.7;
+    --card-foreground: 220 10% 10%;
+
+    --popover: 0 0% 100% / 0.9;
+    --popover-foreground: 220 10% 10%;
+
+    --primary: 210 100% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 90%;
+    --secondary-foreground: 220 10% 10%;
+
+    --muted: 220 10% 92%;
+    --muted-foreground: 220 10% 40%;
+
+    --accent: 280 60% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 85%;
+    --input: 220 15% 85%;
+    --ring: 210 100% 50%;
+    
+    --success: 142 70% 45%;
+    --success-foreground: 0 0% 100%;
+    
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 10% 10%;
+
+    --radius: 0.75rem;
+  }
 }
 
 @layer base {
@@ -113,5 +144,26 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  .glass {
+    backdrop-filter: blur(10px);
+  }
+
+  .glass .card,
+  .glass [class*="card"] {
+    @apply bg-card/70 backdrop-blur-md border-border/50;
+  }
+
+  button {
+    @apply transition-all duration-200;
+  }
+
+  button:hover {
+    @apply scale-105;
+  }
+
+  button:active {
+    @apply scale-95;
   }
 }

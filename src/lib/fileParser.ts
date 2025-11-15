@@ -43,13 +43,13 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
           
           // Find account column - normalize by removing non-numeric chars and leading zeros
           const accountRaw = row['A/c. ID'] || row['a/c_id'] || row['ac_id'] || row['account_id'] || row['account_no'] || '';
-          let account = String(accountRaw).replace(/\D/g, '').trim();
-          // Remove leading zeros by converting to number and back to string
-          if (account && !isNaN(Number(account))) {
-            account = String(Number(account));
-          }
+          let account = String(accountRaw).trim();
+          // Remove all non-numeric characters
+          account = account.replace(/\D/g, '');
+          // Remove leading zeros but keep the number as string
+          account = account.replace(/^0+/, '') || '0';
           
-          console.log('HFTI - Raw:', accountRaw, 'Normalized:', account);
+          console.log('HFTI - Raw:', accountRaw, '-> Normalized:', account);
           
           // Find transaction ID
           const txnId = row['Transaction ID'] || row['txn_id'] || row['tran_id'] || row['reference'] || '';
@@ -148,17 +148,15 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
           // Account Number is typically at index 1
           // Store the raw account number and normalize it for matching
           const accountRaw = String(row[1] || '').trim();
-          // Remove all non-numeric characters and leading zeros
-          let account = accountRaw.replace(/\D/g, '').trim();
-          // Remove leading zeros by converting to number and back to string
-          if (account && !isNaN(Number(account))) {
-            account = String(Number(account));
-          }
+          // Remove all non-numeric characters
+          let account = accountRaw.replace(/\D/g, '');
+          // Remove leading zeros but keep the number as string
+          account = account.replace(/^0+/, '') || '0';
           
           // Skip if no account number or if it looks like a header/footer
-          if (!account || account === '' || isNaN(Number(account))) continue;
+          if (!account || account === '' || account === '0' || isNaN(Number(account))) continue;
           
-          console.log('Last Balance CSV - Raw:', accountRaw, 'Normalized:', account);
+          console.log('Last Balance - Raw:', accountRaw, '-> Normalized:', account);
             
             // Cust1 Name is typically at index 3
             let name = String(row[3] || '').trim();

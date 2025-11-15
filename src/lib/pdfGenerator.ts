@@ -74,76 +74,76 @@ const drawMemo = (
   doc.setFont('helvetica', 'bold');
   doc.text('Memo of Verification', margin + contentMargin, leftY);
   
-  leftY += 6;
+  leftY += 5;
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(
-    `No: ${memo.serial} dated at ${OFFICE_NAME} the ${formatDate(memo.txn_date)}`,
+    `No: ${memo.serial} dated at ${memo.BO_Name} the ${formatDate(memo.txn_date)}`,
     margin + contentMargin,
     leftY,
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  leftY += 10;
-  const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} with ${OFFICE_NAME} on ${formatDate(memo.txn_date)}.`;
+  leftY += 8;
+  const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} with ${memo.BO_Name} on ${formatDate(memo.txn_date)}.`;
   const bodyLines = doc.splitTextToSize(bodyText, columnWidth - (contentMargin * 2));
   doc.text(bodyLines, margin + contentMargin, leftY);
-  leftY += bodyLines.length * 5;
+  leftY += bodyLines.length * 4;
   
-  leftY += 5;
+  leftY += 4;
   doc.text('The name and address of depositor are as below:', margin + contentMargin, leftY);
-  leftY += 5;
+  leftY += 4;
   
   // Name and address
   doc.setFont('helvetica', 'bold');
   const nameLines = doc.splitTextToSize(memo.name, columnWidth - (contentMargin * 2));
   doc.text(nameLines, margin + contentMargin, leftY);
-  leftY += nameLines.length * 4.5;
+  leftY += nameLines.length * 4;
   
   doc.setFont('helvetica', 'normal');
   const addressLines = doc.splitTextToSize(memo.address, columnWidth - (contentMargin * 2));
   doc.text(addressLines, margin + contentMargin, leftY);
-  leftY += addressLines.length * 4.5;
+  leftY += addressLines.length * 4;
   
-  leftY += 8;
+  leftY += 5;
   const instructionText = 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.';
   const instructionLines = doc.splitTextToSize(instructionText, columnWidth - (contentMargin * 2));
   doc.text(instructionLines, margin + contentMargin, leftY);
-  leftY += instructionLines.length * 4.5;
+  leftY += instructionLines.length * 4;
   
   // Bottom left - To address (positioned above footer box)
-  const bottomY = yOffset + halfHeight - margin - footerHeight - 25;
+  const bottomY = yOffset + halfHeight - margin - footerHeight - 20;
   doc.text('To,', margin + contentMargin, bottomY);
-  doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + contentMargin, bottomY + 5);
-  doc.text(`${SUBDIVISION}  ${OFFICE_NAME}`, margin + contentMargin, bottomY + 10);
+  doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + contentMargin, bottomY + 4);
+  doc.text(`${SUBDIVISION}  ${memo.BO_Name}`, margin + contentMargin, bottomY + 8);
   
   // Right column - Reply (starting after header box)
   let rightY = yOffset + headerHeight + 5;
   doc.setFont('helvetica', 'bold');
   doc.text('Reply', middleX + contentMargin, rightY);
   
-  rightY += 6;
+  rightY += 5;
   doc.setFont('helvetica', 'normal');
   doc.text(
-    `No: ${memo.serial} dated at ${OFFICE_NAME} the ${formatDate(memo.txn_date)}`,
+    `No: ${memo.serial} dated at ${memo.BO_Name} the ${formatDate(memo.txn_date)}`,
     middleX + contentMargin,
     rightY,
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  rightY += 10;
+  rightY += 8;
   const replyText = 'The result of verification of the withdrawal particularised in the margin has been found satisfactory/ not satisfactory.\n\nInvestigation has been taken up.';
   const replyLines = doc.splitTextToSize(replyText, columnWidth - (contentMargin * 2));
   doc.text(replyLines, middleX + contentMargin, rightY);
-  rightY += replyLines.length * 5;
+  rightY += replyLines.length * 4;
   
   // Signature block - right aligned in right column (positioned above footer box)
-  const sigY = yOffset + halfHeight - margin - footerHeight - 25;
+  const sigY = yOffset + halfHeight - margin - footerHeight - 20;
   doc.text('THE INSPECTOR OF POSTS', middleX + columnWidth - 55, sigY);
-  doc.text(SUBDIVISION, middleX + columnWidth - 58, sigY + 5);
-  doc.text('To,', middleX + contentMargin, sigY + 12);
-  doc.text('Sub Postmaster', middleX + contentMargin, sigY + 17);
-  doc.text(OFFICE_NAME, middleX + contentMargin, sigY + 22);
+  doc.text(SUBDIVISION, middleX + columnWidth - 58, sigY + 4);
+  doc.text('To,', middleX + contentMargin, sigY + 10);
+  doc.text('Sub Postmaster', middleX + contentMargin, sigY + 14);
+  doc.text(memo.BO_Name, middleX + contentMargin, sigY + 18);
   
   // Draw split footer boxes (left and right for tearing)
   const footerY = yOffset + halfHeight - margin - footerHeight;
@@ -170,17 +170,18 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   });
   
   let pageCount = 0;
-  for (let i = 0; i < memos.length; i += 2) {
+  // Fit 3 memos per page with reduced spacing
+  const memosPerPage = 3;
+  const memoHeight = 297 / memosPerPage; // Divide page height by 3
+  
+  for (let i = 0; i < memos.length; i += memosPerPage) {
     if (pageCount > 0) {
       doc.addPage();
     }
     
-    // Draw first memo (top half)
-    drawMemo(doc, memos[i], 10);
-    
-    // Draw second memo (bottom half) if exists
-    if (i + 1 < memos.length) {
-      drawMemo(doc, memos[i + 1], 158);
+    // Draw up to 3 memos per page
+    for (let j = 0; j < memosPerPage && i + j < memos.length; j++) {
+      drawMemo(doc, memos[i + j], 5 + j * memoHeight);
     }
     
     pageCount++;
@@ -206,13 +207,18 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   doc.text(`Office: ${config.officeName}`, 105, 48, { align: 'center' });
   doc.text(`Subdivision: ${config.subdivision}`, 105, 55, { align: 'center' });
   
-  // Summary section
+  // Summary section with proper alignment
   doc.setFontSize(10);
-  doc.text(`Report Date: ${formatDate(new Date().toISOString())}`, 15, 68);
-  doc.text(`Total Memos: ${memos.length}`, 15, 75);
+  const leftCol = 15;
+  const rightCol = 100;
+  doc.text('Report Date:', leftCol, 68);
+  doc.text(formatDate(new Date().toISOString()), rightCol, 68);
+  doc.text('Total Memos:', leftCol, 75);
+  doc.text(String(memos.length), rightCol, 75);
   
   const totalAmount = memos.reduce((sum, memo) => sum + memo.amount, 0);
-  doc.text(`Total Amount: Rs ${formatAmount(totalAmount)}`, 15, 82);
+  doc.text('Total Amount:', leftCol, 82);
+  doc.text(`Rs ${formatAmount(totalAmount)}`, rightCol, 82);
   
   // Branch Office Summary - First on page with proper spacing
   let yPos = 95;
@@ -222,7 +228,7 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   yPos += 10;
   
   const boGroups = memos.reduce((acc, memo) => {
-    const key = `${memo.BO_Code} - ${memo.BO_Name}`;
+    const key = memo.BO_Name;
     if (!acc[key]) {
       acc[key] = { count: 0, amount: 0 };
     }
@@ -231,35 +237,31 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
     return acc;
   }, {} as Record<string, { count: number; amount: number }>);
   
-  // Draw BO summary table with borders
+  // Draw BO summary table with borders (removed BO Code column)
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  const summaryX = [15, 80, 130, 165];
+  const summaryX = [15, 105, 150];
   
   // Header
   doc.setFillColor(230, 230, 230);
   doc.rect(summaryX[0], yPos - 5, 180, 7, 'F');
-  doc.text('Branch Office Code', summaryX[0] + 2, yPos);
-  doc.text('Branch Office Name', summaryX[1] + 2, yPos);
-  doc.text('Memos', summaryX[2] + 2, yPos);
-  doc.text('Amount (Rs)', summaryX[3] + 2, yPos);
+  doc.text('Branch Office Name', summaryX[0] + 2, yPos);
+  doc.text('Memos', summaryX[1] + 2, yPos);
+  doc.text('Amount (Rs)', summaryX[2] + 2, yPos);
   doc.rect(summaryX[0], yPos - 5, 180, 7);
   yPos += 7;
   
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  Object.entries(boGroups).sort().forEach(([boKey, data], idx) => {
-    const [code, name] = boKey.split(' - ');
-    
+  Object.entries(boGroups).sort().forEach(([boName, data], idx) => {
     if (idx % 2 === 0) {
       doc.setFillColor(245, 245, 245);
       doc.rect(summaryX[0], yPos - 5, 180, 7, 'F');
     }
     
-    doc.text(code, summaryX[0] + 2, yPos);
-    doc.text(name.substring(0, 25), summaryX[1] + 2, yPos);
-    doc.text(String(data.count), summaryX[2] + 2, yPos);
-    doc.text(formatAmount(data.amount), summaryX[3] + 2, yPos, { align: 'right' });
+    doc.text(boName, summaryX[0] + 2, yPos);
+    doc.text(String(data.count), summaryX[1] + 20, yPos, { align: 'center' });
+    doc.text(formatAmount(data.amount), summaryX[2] + 43, yPos, { align: 'right' });
     
     doc.setLineWidth(0.3);
     doc.rect(summaryX[0], yPos - 5, 180, 7);
@@ -281,23 +283,23 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   doc.text('Memo Details', 15, yPos);
   yPos += 10;
   
-  const colX = [15, 35, 75, 115, 150];
+  const tableColX = [15, 30, 70, 115, 145];
   const rowHeight = 7;
   
   // Draw table header
   doc.setFillColor(230, 230, 230);
-  doc.rect(colX[0], yPos - 5, 180, rowHeight, 'F');
+  doc.rect(tableColX[0], yPos - 5, 180, rowHeight, 'F');
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('Sl.No', colX[0] + 2, yPos);
-  doc.text('Account Number', colX[1] + 2, yPos);
-  doc.text('Amount (Rs)', colX[2] + 2, yPos);
-  doc.text('Date', colX[3] + 2, yPos);
-  doc.text('Branch Office', colX[4] + 2, yPos);
+  doc.text('Sl.No', tableColX[0] + 7, yPos, { align: 'center' });
+  doc.text('Account Number', tableColX[1] + 2, yPos);
+  doc.text('Amount (Rs)', tableColX[2] + 40, yPos, { align: 'right' });
+  doc.text('Date', tableColX[3] + 2, yPos);
+  doc.text('Branch Office', tableColX[4] + 2, yPos);
   
   doc.setLineWidth(0.5);
-  doc.rect(colX[0], yPos - 5, 180, rowHeight);
+  doc.rect(tableColX[0], yPos - 5, 180, rowHeight);
   yPos += rowHeight;
   
   // Draw table rows
@@ -311,15 +313,15 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
       
       // Redraw header
       doc.setFillColor(230, 230, 230);
-      doc.rect(colX[0], yPos - 5, 180, rowHeight, 'F');
+      doc.rect(tableColX[0], yPos - 5, 180, rowHeight, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.text('Sl.No', colX[0] + 2, yPos);
-      doc.text('Account Number', colX[1] + 2, yPos);
-      doc.text('Amount (Rs)', colX[2] + 2, yPos);
-      doc.text('Date', colX[3] + 2, yPos);
-      doc.text('Branch Office', colX[4] + 2, yPos);
-      doc.rect(colX[0], yPos - 5, 180, rowHeight);
+      doc.text('Sl.No', tableColX[0] + 7, yPos, { align: 'center' });
+      doc.text('Account Number', tableColX[1] + 2, yPos);
+      doc.text('Amount (Rs)', tableColX[2] + 40, yPos, { align: 'right' });
+      doc.text('Date', tableColX[3] + 2, yPos);
+      doc.text('Branch Office', tableColX[4] + 2, yPos);
+      doc.rect(tableColX[0], yPos - 5, 180, rowHeight);
       yPos += rowHeight;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
@@ -328,22 +330,22 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
     // Alternate row shading
     if (idx % 2 === 0) {
       doc.setFillColor(245, 245, 245);
-      doc.rect(colX[0], yPos - 5, 180, rowHeight, 'F');
+      doc.rect(tableColX[0], yPos - 5, 180, rowHeight, 'F');
     }
     
-    // Right-aligned serial number
-    doc.text(String(memo.serial), colX[0] + 18, yPos, { align: 'right' });
-    doc.text(memo.account.substring(0, 16), colX[1] + 2, yPos);
-    doc.text(formatAmount(memo.amount), colX[2] + 38, yPos, { align: 'right' });
-    doc.text(formatDate(memo.txn_date), colX[3] + 2, yPos);
+    // Center-aligned serial number
+    doc.text(String(memo.serial), tableColX[0] + 7, yPos, { align: 'center' });
+    doc.text(memo.account.substring(0, 16), tableColX[1] + 2, yPos);
+    doc.text(formatAmount(memo.amount), tableColX[2] + 40, yPos, { align: 'right' });
+    doc.text(formatDate(memo.txn_date), tableColX[3] + 2, yPos);
     
     // Truncate BO name if too long
     const boName = memo.BO_Name.length > 22 ? memo.BO_Name.substring(0, 19) + '...' : memo.BO_Name;
-    doc.text(boName, colX[4] + 2, yPos);
+    doc.text(boName, tableColX[4] + 2, yPos);
     
     // Draw row border
     doc.setLineWidth(0.3);
-    doc.rect(colX[0], yPos - 5, 180, rowHeight);
+    doc.rect(tableColX[0], yPos - 5, 180, rowHeight);
     
     yPos += rowHeight;
   });
