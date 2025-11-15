@@ -91,7 +91,29 @@ export const Reports = () => {
       
       XLSX.writeFile(wb, filename);
       
-      toast({ title: 'Export successful' });
+      toast({ title: 'Excel export successful' });
+    } catch (error: any) {
+      toast({ title: 'Export failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const exportToPDF = async (filter?: string) => {
+    try {
+      let memos = await db.memos.toArray();
+      if (filter) {
+        memos = memos.filter(m => m.status === filter);
+      }
+      
+      const { generateConsolidatedPDF } = await import('@/lib/pdfGenerator');
+      const doc = generateConsolidatedPDF(memos);
+      
+      const filename = filter 
+        ? `${filter.toLowerCase()}_report_${new Date().toISOString().split('T')[0]}.pdf`
+        : `all_memos_report_${new Date().toISOString().split('T')[0]}.pdf`;
+      
+      doc.save(filename);
+      
+      toast({ title: 'PDF export successful' });
     } catch (error: any) {
       toast({ title: 'Export failed', description: error.message, variant: 'destructive' });
     }
@@ -182,24 +204,40 @@ export const Reports = () => {
           <CardDescription>Download data in various formats</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Button onClick={() => exportToExcel()} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              All Memos (Excel)
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => exportToExcel()} variant="outline" className="w-full">
+              <Download className="mr-2 h-4 w-4" />
+              Excel - All
             </Button>
-            <Button onClick={() => exportToExcel('Pending')} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Pending Only (Excel)
-            </Button>
-            <Button onClick={() => exportToExcel('Verified')} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Verified Only (Excel)
-            </Button>
-            <Button onClick={() => exportToExcel('Reported')} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Reported Only (Excel)
+            <Button onClick={() => exportToPDF()} variant="outline" className="w-full">
+              <Download className="mr-2 h-4 w-4" />
+              PDF - All
             </Button>
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => exportToExcel('Pending')} variant="outline" size="sm" className="w-full">
+              <Download className="mr-2 h-3 w-3" />
+              Excel - Pending
+            </Button>
+            <Button onClick={() => exportToPDF('Pending')} variant="outline" size="sm" className="w-full">
+              <Download className="mr-2 h-3 w-3" />
+              PDF - Pending
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button onClick={() => exportToExcel('Verified')} variant="outline" size="sm" className="w-full">
+              <Download className="mr-2 h-3 w-3" />
+              Excel - Verified
+            </Button>
+            <Button onClick={() => exportToPDF('Verified')} variant="outline" size="sm" className="w-full">
+              <Download className="mr-2 h-3 w-3" />
+              PDF - Verified
+            </Button>
+          </div>
+          <Button onClick={exportBackup} variant="outline" className="w-full mt-2">
+            <Download className="mr-2 h-4 w-4" />
+            Full Backup (JSON)
+          </Button>
         </CardContent>
       </Card>
 

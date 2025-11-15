@@ -42,25 +42,24 @@ export const Upload = () => {
       // Create account lookup with normalized account numbers (remove leading zeros)
       const accountMap = new Map<string, LastBalanceRecord>();
       balanceRecords.forEach(rec => {
-        // Normalize account number by removing all non-numeric characters and leading zeros
-        let normalizedAccount = rec.account.replace(/\D/g, '');
-        if (normalizedAccount && !isNaN(Number(normalizedAccount))) {
-          normalizedAccount = String(Number(normalizedAccount));
-        }
+        // Normalize: remove non-numeric and leading zeros
+        let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
         accountMap.set(normalizedAccount, rec);
+        console.log('AccountMap - Adding:', normalizedAccount, '-> Name:', rec.name);
       });
+      
+      console.log('Total accounts in map:', accountMap.size);
 
       // Filter by threshold and merge data
       const candidates = transactions
         .filter(t => t.amount >= threshold)
         .map(t => {
-          // Normalize account number for lookup (remove leading zeros)
-          let normalizedAccount = t.account.replace(/\D/g, '');
-          if (normalizedAccount && !isNaN(Number(normalizedAccount))) {
-            normalizedAccount = String(Number(normalizedAccount));
-          }
+          // Normalize: remove non-numeric and leading zeros
+          let normalizedAccount = t.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
           const balanceData = accountMap.get(normalizedAccount);
           const bo = detectBOCode(t.particulars);
+          
+          console.log('Looking up:', normalizedAccount, '-> Found:', balanceData?.name || 'NOT FOUND');
           
           return {
             txn_date: t.txn_date,

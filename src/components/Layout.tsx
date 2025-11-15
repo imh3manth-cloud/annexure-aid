@@ -1,4 +1,5 @@
 import { NavLink } from './NavLink';
+import { ThemeSelector } from './ThemeSelector';
 import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig } from '@/lib/config';
@@ -28,8 +29,11 @@ export const Layout = ({ children }: LayoutProps) => {
                 <p className="text-xs text-muted-foreground">High-Value Withdrawal Verification</p>
               </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              {subdivision}
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                {subdivision}
+              </div>
+              <ThemeSelector />
             </div>
           </div>
         </div>
