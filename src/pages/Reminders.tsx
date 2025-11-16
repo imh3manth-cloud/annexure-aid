@@ -54,8 +54,22 @@ export const Reminders = () => {
     }
 
     try {
+      // Group by branch office for continuous display
+      const groupedByBO = selectedMemos.reduce((acc, memo) => {
+        const key = memo.BO_Name;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(memo);
+        return acc;
+      }, {} as Record<string, MemoRecord[]>);
+      
+      // Flatten back but grouped
+      const sortedMemos: MemoRecord[] = [];
+      Object.values(groupedByBO).forEach(group => {
+        sortedMemos.push(...group);
+      });
+
       // Update memo records
-      for (const memo of selectedMemos) {
+      for (const memo of sortedMemos) {
         const newReminderCount = memo.reminder_count + 1;
         const newRemarks = memo.remarks
           ? `${memo.remarks}; Reminder ${newReminderCount} on ${reminderDate}`
@@ -69,7 +83,7 @@ export const Reminders = () => {
       }
 
       // Generate PDF
-      const updatedMemos = await db.memos.bulkGet(selectedMemos.map(m => m.id!));
+      const updatedMemos = await db.memos.bulkGet(sortedMemos.map(m => m.id!));
       const pdf = generateReminderPDF(updatedMemos.filter(Boolean) as MemoRecord[]);
       pdf.save(`reminders_${reminderDate}.pdf`);
 

@@ -10,6 +10,8 @@ export interface MemoRecord {
   txn_date: string;
   name: string;
   address: string;
+  balance: number;
+  balance_date: string;
   BO_Code: string;
   BO_Name: string;
   status: 'New' | 'Pending' | 'Verified' | 'Reported';
@@ -23,6 +25,13 @@ export interface MemoRecord {
   created_at: string;
 }
 
+export interface LastBalanceUpload {
+  id?: number;
+  filename: string;
+  uploadDate: string;
+  recordCount: number;
+}
+
 export interface AppSettings {
   id: string;
   lastSerial: number;
@@ -33,12 +42,14 @@ export interface AppSettings {
 class MemoDatabase extends Dexie {
   memos!: Table<MemoRecord>;
   settings!: Table<AppSettings>;
+  lastBalanceUploads!: Table<LastBalanceUpload>;
 
   constructor() {
     super('MemoDatabase');
-    this.version(1).stores({
+    this.version(2).stores({
       memos: '++id, serial, memoKey, account, status, BO_Code, printed',
-      settings: 'id'
+      settings: 'id',
+      lastBalanceUploads: '++id, uploadDate'
     });
   }
 }
