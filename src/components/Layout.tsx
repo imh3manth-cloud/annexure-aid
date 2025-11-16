@@ -12,8 +12,30 @@ export const Layout = ({ children }: LayoutProps) => {
   const [subdivision, setSubdivision] = useState('T NARASIPURA SUB DIVISION');
 
   useEffect(() => {
-    const config = getConfig();
-    setSubdivision(config.subdivision);
+    const loadConfig = () => {
+      const config = getConfig();
+      setSubdivision(config.subdivision);
+    };
+    
+    loadConfig();
+    
+    // Listen for storage changes (when settings are updated)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'appConfig') {
+        loadConfig();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom event from same tab
+    const handleConfigChange = () => loadConfig();
+    window.addEventListener('configUpdated', handleConfigChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('configUpdated', handleConfigChange);
+    };
   }, []);
   return (
     <div className="min-h-screen bg-background">
