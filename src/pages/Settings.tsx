@@ -75,6 +75,8 @@ export const Settings = () => {
     };
     localStorage.setItem('appConfig', JSON.stringify(updatedConfig));
     setConfig(updatedConfig);
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new Event('configUpdated'));
     toast({ title: 'Settings saved successfully' });
   };
 
