@@ -13,6 +13,8 @@ export interface LastBalanceRecord {
   account: string;
   name: string;
   address: string;
+  balance: number;
+  balance_date: string;
   bo_name?: string;
 }
 
@@ -170,6 +172,13 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
             // Address is typically around index 12 (may contain commas)
             let address = String(row[12] || '').trim();
             
+            // Balance is typically at index 10 or 11
+            const balanceRaw = String(row[10] || row[11] || '0').trim();
+            const balance = parseFloat(balanceRaw.replace(/[^0-9.-]/g, '')) || 0;
+            
+            // Date of balance (from filename or current date)
+            const balanceDate = new Date().toISOString().split('T')[0];
+            
             // BO Name is typically the last column
             const boName = String(row[row.length - 1] || '').trim();
             
@@ -178,6 +187,8 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
                 account,
                 name,
                 address,
+                balance,
+                balance_date: balanceDate,
                 bo_name: boName
               });
             }

@@ -68,6 +68,8 @@ export const Upload = () => {
             amount: t.amount,
             name: balanceData?.name || 'NAME NOT FOUND',
             address: balanceData?.address || 'ADDRESS NOT FOUND',
+            balance: balanceData?.balance || 0,
+            balance_date: balanceData?.balance_date || t.txn_date,
             BO_Code: bo.code,
             BO_Name: bo.name,
             particulars: t.particulars
@@ -183,27 +185,32 @@ export const Upload = () => {
       }
 
       // Assign serials and create records
-      const memos: MemoRecord[] = candidates.map(c => ({
-        serial: ++lastSerial,
-        memoKey: c.memoKey,
-        account: c.account,
-        txn_id: c.txn_id,
-        amount: c.amount,
-        txn_date: c.txn_date,
-        name: c.name,
-        address: c.address,
-        BO_Code: c.BO_Code,
-        BO_Name: c.BO_Name,
-        status: 'New',
-        printed: false,
-        memo_sent_date: null,
-        reminder_count: 0,
-        last_reminder_date: null,
-        verified_date: null,
-        reported_date: null,
-        remarks: '',
-        created_at: new Date().toISOString()
-      }));
+      const memos: MemoRecord[] = candidates.map(c => {
+        const balanceData = accountMap.get(c.account);
+        return {
+          serial: ++lastSerial,
+          memoKey: c.memoKey,
+          account: c.account,
+          txn_id: c.txn_id,
+          amount: c.amount,
+          txn_date: c.txn_date,
+          name: c.name,
+          address: c.address,
+          balance: balanceData?.balance || 0,
+          balance_date: balanceData?.balance_date || c.txn_date,
+          BO_Code: c.BO_Code,
+          BO_Name: c.BO_Name,
+          status: 'New',
+          printed: false,
+          memo_sent_date: null,
+          reminder_count: 0,
+          last_reminder_date: null,
+          verified_date: null,
+          reported_date: null,
+          remarks: '',
+          created_at: new Date().toISOString()
+        };
+      });
 
       // Save to database
       await db.memos.bulkAdd(memos);

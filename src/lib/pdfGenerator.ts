@@ -37,11 +37,11 @@ const drawMemo = (
   const pageHeight = 297; // A4 height in mm
   const halfHeight = pageHeight / 2;
   const margin = 10;
-  const contentMargin = 3; // Internal margin within border
+  const contentMargin = 2; // Reduced internal margin
   const columnWidth = (pageWidth - 2 * margin) / 2;
   const middleX = margin + columnWidth;
-  const headerHeight = 12; // Height for header box
-  const footerHeight = 12; // Height for footer box
+  const headerHeight = 10; // Reduced header height
+  const footerHeight = 10; // Reduced footer height
   
   // Draw main border for this memo half
   doc.setLineWidth(0.5);
@@ -69,12 +69,12 @@ const drawMemo = (
   doc.line(middleX, yOffset + headerHeight, middleX, yOffset + halfHeight - margin - footerHeight);
   
   // Left column - Memo of Verification (starting after header box)
-  let leftY = yOffset + headerHeight + 5;
+  let leftY = yOffset + headerHeight + 4; // Reduced spacing
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Memo of Verification', margin + contentMargin, leftY);
   
-  leftY += 5;
+  leftY += 4; // Reduced spacing
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
   doc.text(
@@ -84,13 +84,13 @@ const drawMemo = (
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  leftY += 8;
-  const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} with ${memo.BO_Name} on ${formatDate(memo.txn_date)}.`;
+  leftY += 6; // Reduced spacing
+  const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} with ${memo.BO_Name} on ${formatDate(memo.txn_date)}. Balance after transaction as per Last Balance dated ${formatDate(memo.balance_date)} is Rs ${formatAmount(memo.balance)}.`;
   const bodyLines = doc.splitTextToSize(bodyText, columnWidth - (contentMargin * 2));
   doc.text(bodyLines, margin + contentMargin, leftY);
   leftY += bodyLines.length * 4;
   
-  leftY += 4;
+  leftY += 3; // Reduced spacing
   doc.text('The name and address of depositor are as below:', margin + contentMargin, leftY);
   leftY += 4;
   
@@ -105,24 +105,24 @@ const drawMemo = (
   doc.text(addressLines, margin + contentMargin, leftY);
   leftY += addressLines.length * 4;
   
-  leftY += 5;
+  leftY += 4; // Reduced spacing
   const instructionText = 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.';
   const instructionLines = doc.splitTextToSize(instructionText, columnWidth - (contentMargin * 2));
   doc.text(instructionLines, margin + contentMargin, leftY);
   leftY += instructionLines.length * 4;
   
   // Bottom left - To address (positioned above footer box)
-  const bottomY = yOffset + halfHeight - margin - footerHeight - 20;
+  const bottomY = yOffset + halfHeight - margin - footerHeight - 15; // Reduced spacing
   doc.text('To,', margin + contentMargin, bottomY);
   doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + contentMargin, bottomY + 4);
   doc.text(`${SUBDIVISION}  ${memo.BO_Name}`, margin + contentMargin, bottomY + 8);
   
   // Right column - Reply (starting after header box)
-  let rightY = yOffset + headerHeight + 5;
+  let rightY = yOffset + headerHeight + 4; // Reduced spacing
   doc.setFont('helvetica', 'bold');
   doc.text('Reply', middleX + contentMargin, rightY);
   
-  rightY += 5;
+  rightY += 4; // Reduced spacing
   doc.setFont('helvetica', 'normal');
   doc.text(
     `No: ${memo.serial} dated at ${memo.BO_Name} the ${formatDate(memo.txn_date)}`,
@@ -131,14 +131,14 @@ const drawMemo = (
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  rightY += 8;
+  rightY += 6; // Reduced spacing
   const replyText = 'The result of verification of the withdrawal particularised in the margin has been found satisfactory/ not satisfactory.\n\nInvestigation has been taken up.';
   const replyLines = doc.splitTextToSize(replyText, columnWidth - (contentMargin * 2));
   doc.text(replyLines, middleX + contentMargin, rightY);
   rightY += replyLines.length * 4;
   
   // Signature block - right aligned in right column (positioned above footer box)
-  const sigY = yOffset + halfHeight - margin - footerHeight - 20;
+  const sigY = yOffset + halfHeight - margin - footerHeight - 15; // Reduced spacing
   doc.text('THE INSPECTOR OF POSTS', middleX + columnWidth - 55, sigY);
   doc.text(SUBDIVISION, middleX + columnWidth - 58, sigY + 4);
   doc.text('To,', middleX + contentMargin, sigY + 10);
@@ -170,16 +170,16 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   });
   
   let pageCount = 0;
-  // Fit 3 memos per page with reduced spacing
-  const memosPerPage = 3;
-  const memoHeight = 297 / memosPerPage; // Divide page height by 3
+  // Fit 2 memos per page (reverted from 3 to avoid overlapping)
+  const memosPerPage = 2;
+  const memoHeight = 297 / memosPerPage; // Divide page height by 2
   
   for (let i = 0; i < memos.length; i += memosPerPage) {
     if (pageCount > 0) {
       doc.addPage();
     }
     
-    // Draw up to 3 memos per page
+    // Draw up to 2 memos per page
     for (let j = 0; j < memosPerPage && i + j < memos.length; j++) {
       drawMemo(doc, memos[i + j], 5 + j * memoHeight);
     }
