@@ -43,9 +43,12 @@ const drawMemo = (
   const headerHeight = 10; // Reduced header height
   const footerHeight = 10; // Reduced footer height
   
-  // Draw main border for this memo half
+  // Calculate available height for memo content
+  const availableHeight = halfHeight - margin - 5; // 5mm buffer at bottom
+  
+  // Draw main border for this memo section
   doc.setLineWidth(0.5);
-  doc.rect(margin, yOffset, pageWidth - 2 * margin, halfHeight - margin);
+  doc.rect(margin, yOffset, pageWidth - 2 * margin, availableHeight);
   
   // Draw split header boxes (left and right for tearing)
   doc.rect(margin, yOffset, columnWidth, headerHeight);
@@ -66,7 +69,8 @@ const drawMemo = (
   doc.text('[See para 105]', middleX + columnWidth / 2, yOffset + 10, { align: 'center' });
   
   // Draw vertical line separating left and right columns (starting after header)
-  doc.line(middleX, yOffset + headerHeight, middleX, yOffset + halfHeight - margin - footerHeight);
+  const contentBottom = yOffset + availableHeight - footerHeight;
+  doc.line(middleX, yOffset + headerHeight, middleX, contentBottom);
   
   // Left column - Memo of Verification (starting after header box)
   let leftY = yOffset + headerHeight + 4; // Reduced spacing
@@ -84,8 +88,8 @@ const drawMemo = (
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  leftY += 6; // Reduced spacing
-  const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} with ${memo.BO_Name} on ${formatDate(memo.txn_date)}. Balance after transaction as per Last Balance dated ${formatDate(memo.balance_date)} is Rs ${formatAmount(memo.balance)}.`;
+  leftY += 6;
+  const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} at ${memo.BO_Name} on ${formatDate(memo.txn_date)}. Balance after transaction as per Last Balance dated ${formatDate(memo.balance_date)} is Rs ${formatAmount(memo.balance)}.`;
   const bodyLines = doc.splitTextToSize(bodyText, columnWidth - (contentMargin * 2));
   doc.text(bodyLines, margin + contentMargin, leftY);
   leftY += bodyLines.length * 4;
@@ -105,20 +109,21 @@ const drawMemo = (
   doc.text(addressLines, margin + contentMargin, leftY);
   leftY += addressLines.length * 4;
   
-  leftY += 4; // Reduced spacing
-  const instructionText = 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.';
-  const instructionLines = doc.splitTextToSize(instructionText, columnWidth - (contentMargin * 2));
-  doc.text(instructionLines, margin + contentMargin, leftY);
-  leftY += instructionLines.length * 4;
+  leftY += 3;
   
-  // Bottom left - To address (positioned above footer box)
-  const bottomY = yOffset + halfHeight - margin - footerHeight - 15; // Reduced spacing
-  doc.text('To,', margin + contentMargin, bottomY);
-  doc.text('THE INSPECTOR OF POSTS    Sub Postmaster', margin + contentMargin, bottomY + 4);
-  doc.text(`${SUBDIVISION}  ${memo.BO_Name}`, margin + contentMargin, bottomY + 8);
+  // Draw footer separator line
+  const footerY = contentBottom;
+  doc.line(margin, footerY, middleX, footerY);
   
-  // Right column - Reply (starting after header box)
-  let rightY = yOffset + headerHeight + 4; // Reduced spacing
+  // Footer text with Sub Office name from settings
+  doc.setFontSize(8);
+  leftY = footerY + 3;
+  doc.text(`Sub Post Master`, margin + contentMargin, leftY);
+  leftY += 3;
+  doc.text(`${OFFICE_NAME}`, margin + contentMargin, leftY);
+  
+  // Right column
+  let rightY = yOffset + headerHeight + 4;
   doc.setFont('helvetica', 'bold');
   doc.text('Reply', middleX + contentMargin, rightY);
   
@@ -131,34 +136,18 @@ const drawMemo = (
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  rightY += 6; // Reduced spacing
-  const replyText = 'The result of verification of the withdrawal particularised in the margin has been found satisfactory/ not satisfactory.\n\nInvestigation has been taken up.';
-  const replyLines = doc.splitTextToSize(replyText, columnWidth - (contentMargin * 2));
-  doc.text(replyLines, middleX + contentMargin, rightY);
-  rightY += replyLines.length * 4;
+  rightY += 3;
   
-  // Signature block - right aligned in right column (positioned above footer box)
-  const sigY = yOffset + halfHeight - margin - footerHeight - 15; // Reduced spacing
-  doc.text('THE INSPECTOR OF POSTS', middleX + columnWidth - 55, sigY);
-  doc.text(SUBDIVISION, middleX + columnWidth - 58, sigY + 4);
-  doc.text('To,', middleX + contentMargin, sigY + 10);
-  doc.text('Sub Postmaster', middleX + contentMargin, sigY + 14);
-  doc.text(memo.BO_Name, middleX + contentMargin, sigY + 18);
+  // Draw right footer separator
+  doc.line(middleX, footerY, pageWidth - margin, footerY);
   
-  // Draw split footer boxes (left and right for tearing)
-  const footerY = yOffset + halfHeight - margin - footerHeight;
-  doc.rect(margin, footerY, columnWidth, footerHeight);
-  doc.rect(middleX, footerY, columnWidth, footerHeight);
-  
-  // Footer note - split into left and right boxes
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  const noteText = 'Note: The verification memo should be returned to the HO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of P.R.I and within 30 days in all other cases.';
-  const noteLines = doc.splitTextToSize(noteText, columnWidth - (contentMargin * 2));
-  doc.text(noteLines, margin + contentMargin, footerY + 4);
-  
-  // Right footer (duplicate)
-  doc.text(noteLines, middleX + contentMargin, footerY + 4);
+  // Right footer with Sub Office name
+  rightY = footerY + 3;
+  doc.text('Reply under certificate of posting', middleX + contentMargin, rightY);
+  rightY += 3;
+  doc.text(`Sub Post Master`, middleX + contentMargin, rightY);
+  rightY += 3;
+  doc.text(`${OFFICE_NAME}`, middleX + contentMargin, rightY);
 };
 
 // Generate consolidated PDF for multiple memos with summary report

@@ -116,14 +116,49 @@ export const VerifyReplies = () => {
 
   if (!currentMemo) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div>
           <h2 className="text-3xl font-bold text-foreground">Verify Replies</h2>
           <p className="text-muted-foreground mt-1">Process verification responses</p>
         </div>
-        <Card>
+
+        {/* Search Section */}
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Search className="h-5 w-5 text-primary" />
+              Search Pending Memos
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Label htmlFor="search">Search by Serial, Account, or Name</Label>
+                <Input
+                  id="search"
+                  placeholder="Enter serial number, account number, or name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-md">
           <CardContent className="py-12">
-            <p className="text-center text-muted-foreground">No pending memos to verify</p>
+            <div className="text-center">
+              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <p className="text-lg font-medium text-foreground mb-2">All Caught Up!</p>
+              <p className="text-muted-foreground">
+                {searchQuery ? 'No memos found matching your search.' : 'No pending memos to verify.'}
+              </p>
+              {searchQuery && (
+                <Button variant="outline" className="mt-4" onClick={() => setSearchQuery('')}>
+                  Clear Search
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

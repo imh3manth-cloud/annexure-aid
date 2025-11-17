@@ -66,64 +66,64 @@ export const Layout = ({ children }: LayoutProps) => {
           <nav className="flex space-x-1">
             <NavLink
               to="/"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
-              activeClassName="text-foreground bg-background border-b-2 border-primary"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
             >
-              <LayoutDashboard className="w-4 h-4" />
+              <LayoutDashboard className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Dashboard</span>
             </NavLink>
             
             <NavLink
               to="/upload"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
-              activeClassName="text-foreground bg-background border-b-2 border-primary"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
             >
-              <FileUp className="w-4 h-4" />
+              <FileUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Upload</span>
             </NavLink>
             
             <NavLink
               to="/register"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
-              activeClassName="text-foreground bg-background border-b-2 border-primary"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
             >
-              <List className="w-4 h-4" />
+              <List className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Memo Register</span>
             </NavLink>
             
             <NavLink
               to="/verify"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
-              activeClassName="text-foreground bg-background border-b-2 border-primary"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
             >
-              <CheckCircle className="w-4 h-4" />
+              <CheckCircle className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Verify Replies</span>
             </NavLink>
             
             <NavLink
               to="/reminders"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
-              activeClassName="text-foreground bg-background border-b-2 border-primary"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
             >
-              <Bell className="w-4 h-4" />
+              <Bell className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Reminders</span>
             </NavLink>
             
             <NavLink
               to="/reports"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
-              activeClassName="text-foreground bg-background border-b-2 border-primary"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
             >
-              <BarChart3 className="w-4 h-4" />
+              <BarChart3 className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Reports</span>
             </NavLink>
             
             <NavLink
               to="/settings"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-background/50 transition-colors"
-              activeClassName="text-foreground bg-background border-b-2 border-primary"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Settings</span>
             </NavLink>
           </nav>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,18 @@ export const Upload = () => {
   const [groupByBO, setGroupByBO] = useState(true);
   const [preview, setPreview] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
+  const [uploadHistory, setUploadHistory] = useState<any[]>([]);
+  const [useExistingBalance, setUseExistingBalance] = useState(false);
   const { toast } = useToast();
+
+  useEffect(() => {
+    loadUploadHistory();
+  }, []);
+
+  const loadUploadHistory = async () => {
+    const history = await db.lastBalanceUploads.orderBy('uploadDate').reverse().limit(10).toArray();
+    setUploadHistory(history);
+  };
 
   const handlePreview = async () => {
     if (!hftiFile || balanceFiles.length === 0) {
@@ -310,6 +321,65 @@ export const Upload = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Last Balance Upload History */}
+      {uploadHistory.length > 0 && (
+        <Card className="shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5 text-accent" />
+              Last Balance Upload History
+            </CardTitle>
+            <CardDescription>Recent last balance file uploads - select to reuse</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="useExisting"
+                  checked={useExistingBalance}
+                  onChange={(e) => setUseExistingBalance(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                <Label htmlFor="useExisting">Use previously uploaded last balance data</Label>
+              </div>
+              
+              {useExistingBalance && (
+                <div className="grid gap-3 mt-4">
+                  {uploadHistory.map((upload) => (
+                    <div
+                      key={upload.id}
+                      className="p-4 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{upload.filename}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(upload.uploadDate).toLocaleDateString()} - {upload.recordCount} records
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            toast({
+                              title: 'Using previous data',
+                              description: `Using ${upload.filename} for balance information`
+                            });
+                          }}
+                        >
+                          Use This
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {preview && (
         <Card>
