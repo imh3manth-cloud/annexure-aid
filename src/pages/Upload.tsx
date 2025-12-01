@@ -45,10 +45,25 @@ export const Upload = () => {
       const transactions = await parseHFTIFile(hftiFile);
       
       const balanceRecords: LastBalanceRecord[] = [];
+      let latestPreparedDate = '';
+      
       for (const file of balanceFiles) {
-        const records = await parseLastBalanceCSV(file);
+        const { records, preparedDate } = await parseLastBalanceCSV(file);
         balanceRecords.push(...records);
+        if (!latestPreparedDate || preparedDate > latestPreparedDate) {
+          latestPreparedDate = preparedDate;
+        }
+        
+        // Save to upload history
+        await db.lastBalanceUploads.add({
+          filename: file.name,
+          uploadDate: new Date().toISOString(),
+          recordCount: records.length
+        });
       }
+      
+      // Reload upload history
+      loadUploadHistory();
 
       // Create account lookup with normalized account numbers (remove leading zeros)
       const accountMap = new Map<string, LastBalanceRecord>();
@@ -56,7 +71,7 @@ export const Upload = () => {
         // Normalize: remove non-numeric and leading zeros
         let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
         accountMap.set(normalizedAccount, rec);
-        console.log('AccountMap - Adding:', normalizedAccount, '-> Name:', rec.name);
+        console.log('AccountMap - Adding:', normalizedAccount, '-> Name:', rec.name, 'Balance:', rec.balance, 'Date:', rec.balance_date);
       });
       
       console.log('Total accounts in map:', accountMap.size);
@@ -70,7 +85,7 @@ export const Upload = () => {
           const balanceData = accountMap.get(normalizedAccount);
           const bo = detectBOCode(t.particulars);
           
-          console.log('Looking up:', normalizedAccount, '-> Found:', balanceData?.name || 'NOT FOUND');
+          console.log('Looking up:', normalizedAccount, '-> Found:', balanceData?.name || 'NOT FOUND', 'Balance:', balanceData?.balance);
           
           return {
             txn_date: t.txn_date,
@@ -80,7 +95,7 @@ export const Upload = () => {
             name: balanceData?.name || 'NAME NOT FOUND',
             address: balanceData?.address || 'ADDRESS NOT FOUND',
             balance: balanceData?.balance || 0,
-            balance_date: balanceData?.balance_date || t.txn_date,
+            balance_date: balanceData?.balance_date || latestPreparedDate || t.txn_date,
             BO_Code: bo.code,
             BO_Name: bo.name,
             particulars: t.particulars
@@ -102,12 +117,13 @@ export const Upload = () => {
         total: candidates.length,
         new: newCandidates.length,
         duplicates,
-        samples: newCandidates.slice(0, 5)
+        samples: newCandidates.slice(0, 5),
+        preparedDate: latestPreparedDate
       });
 
       toast({
         title: 'Preview ready',
-        description: `Found ${newCandidates.length} new transactions (${duplicates} duplicates skipped)`
+        description: `Found ${newCandidates.length} new transactions (${duplicates} duplicates skipped). Balance date: ${latestPreparedDate}`
       });
     } catch (error: any) {
       toast({
@@ -132,25 +148,33 @@ export const Upload = () => {
       // Parse files again
       const transactions = await parseHFTIFile(hftiFile!);
       const balanceRecords: LastBalanceRecord[] = [];
+      let latestPreparedDate = '';
+      
       for (const file of balanceFiles) {
-        const records = await parseLastBalanceCSV(file);
+        const { records, preparedDate } = await parseLastBalanceCSV(file);
         balanceRecords.push(...records);
+        if (!latestPreparedDate || preparedDate > latestPreparedDate) {
+          latestPreparedDate = preparedDate;
+        }
       }
 
+      // Use normalized account numbers for lookup
       const accountMap = new Map<string, LastBalanceRecord>();
       balanceRecords.forEach(rec => {
-        accountMap.set(rec.account, rec);
+        let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+        accountMap.set(normalizedAccount, rec);
       });
 
       // Get existing memos
       const existing = await db.memos.toArray();
       const existingKeys = new Set(existing.map(m => m.memoKey));
 
-      // Build candidates
+      // Build candidates with normalized account lookup
       let candidates = transactions
         .filter(t => t.amount >= threshold)
         .map(t => {
-          const balanceData = accountMap.get(t.account);
+          let normalizedAccount = t.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+          const balanceData = accountMap.get(normalizedAccount);
           const bo = detectBOCode(t.particulars);
           const key = `${t.txn_id}|${t.account}|${t.amount}|${t.txn_date}`;
           
@@ -162,6 +186,8 @@ export const Upload = () => {
             txn_date: t.txn_date,
             name: balanceData?.name || 'NAME NOT FOUND',
             address: balanceData?.address || 'ADDRESS NOT FOUND',
+            balance: balanceData?.balance || 0,
+            balance_date: balanceData?.balance_date || latestPreparedDate || t.txn_date,
             BO_Code: bo.code,
             BO_Name: bo.name
           };
@@ -170,7 +196,6 @@ export const Upload = () => {
 
       // Sort and assign serials
       if (groupByBO) {
-        // Group by BO
         const groups = new Map<string, typeof candidates>();
         candidates.forEach(c => {
           if (!groups.has(c.BO_Code)) {
@@ -179,7 +204,6 @@ export const Upload = () => {
           groups.get(c.BO_Code)!.push(c);
         });
 
-        // Sort groups
         const sortedGroups = Array.from(groups.entries()).sort((a, b) => {
           if (a[0] === 'Unknown') return 1;
           if (b[0] === 'Unknown') return -1;
@@ -196,32 +220,29 @@ export const Upload = () => {
       }
 
       // Assign serials and create records
-      const memos: MemoRecord[] = candidates.map(c => {
-        const balanceData = accountMap.get(c.account);
-        return {
-          serial: ++lastSerial,
-          memoKey: c.memoKey,
-          account: c.account,
-          txn_id: c.txn_id,
-          amount: c.amount,
-          txn_date: c.txn_date,
-          name: c.name,
-          address: c.address,
-          balance: balanceData?.balance || 0,
-          balance_date: balanceData?.balance_date || c.txn_date,
-          BO_Code: c.BO_Code,
-          BO_Name: c.BO_Name,
-          status: 'New',
-          printed: false,
-          memo_sent_date: null,
-          reminder_count: 0,
-          last_reminder_date: null,
-          verified_date: null,
-          reported_date: null,
-          remarks: '',
-          created_at: new Date().toISOString()
-        };
-      });
+      const memos: MemoRecord[] = candidates.map(c => ({
+        serial: ++lastSerial,
+        memoKey: c.memoKey,
+        account: c.account,
+        txn_id: c.txn_id,
+        amount: c.amount,
+        txn_date: c.txn_date,
+        name: c.name,
+        address: c.address,
+        balance: c.balance,
+        balance_date: c.balance_date,
+        BO_Code: c.BO_Code,
+        BO_Name: c.BO_Name,
+        status: 'New',
+        printed: false,
+        memo_sent_date: null,
+        reminder_count: 0,
+        last_reminder_date: null,
+        verified_date: null,
+        reported_date: null,
+        remarks: '',
+        created_at: new Date().toISOString()
+      }));
 
       // Save to database
       await db.memos.bulkAdd(memos);

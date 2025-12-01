@@ -115,7 +115,7 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
 };
 
 // Parse Last Balance CSV files
-export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> => {
+export const parseLastBalanceCSV = (file: File): Promise<{ records: LastBalanceRecord[]; preparedDate: string }> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
       header: false, // Parse without headers to handle complex structure
@@ -124,6 +124,51 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
         try {
           const records: LastBalanceRecord[] = [];
           const rows = results.data as any[][];
+          
+          // Try to extract prepared date from the file
+          let preparedDate = new Date().toISOString().split('T')[0];
+          
+          // Search in first 15 rows for "Prepared Date" or similar
+          for (let i = 0; i < Math.min(15, rows.length); i++) {
+            const row = rows[i];
+            const rowText = row.join(' ').toLowerCase();
+            
+            // Look for prepared date patterns
+            if (rowText.includes('prepared') || rowText.includes('date')) {
+              for (let j = 0; j < row.length; j++) {
+                const cell = String(row[j] || '').trim();
+                // Try to match date patterns like DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
+                const dateMatch = cell.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+                if (dateMatch) {
+                  const [, d1, d2, year] = dateMatch;
+                  const fullYear = year.length === 2 ? `20${year}` : year;
+                  // Determine if d1/d2 is day/month or month/day
+                  const day = parseInt(d1) > 12 ? d1 : d2;
+                  const month = parseInt(d1) > 12 ? d2 : d1;
+                  preparedDate = `${fullYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  console.log('Extracted prepared date:', preparedDate, 'from cell:', cell);
+                  break;
+                }
+              }
+            }
+            
+            // Also check for timestamp in headers
+            if (rowText.includes('timestamp') || rowText.includes('as on')) {
+              for (let j = 0; j < row.length; j++) {
+                const cell = String(row[j] || '').trim();
+                const dateMatch = cell.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
+                if (dateMatch) {
+                  const [, d1, d2, year] = dateMatch;
+                  const fullYear = year.length === 2 ? `20${year}` : year;
+                  const day = parseInt(d1) > 12 ? d1 : d2;
+                  const month = parseInt(d1) > 12 ? d2 : d1;
+                  preparedDate = `${fullYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  console.log('Extracted timestamp date:', preparedDate, 'from cell:', cell);
+                  break;
+                }
+              }
+            }
+          }
           
           // Find the header row (contains "Account Number")
           let headerRowIndex = -1;
@@ -147,18 +192,15 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
             // Skip rows that don't have enough columns or look like headers
             if (!row || row.length < 10) continue;
             
-          // Account Number is typically at index 1
-          // Store the raw account number and normalize it for matching
-          const accountRaw = String(row[1] || '').trim();
-          // Remove all non-numeric characters
-          let account = accountRaw.replace(/\D/g, '');
-          // Remove leading zeros but keep the number as string
-          account = account.replace(/^0+/, '') || '0';
-          
-          // Skip if no account number or if it looks like a header/footer
-          if (!account || account === '' || account === '0' || isNaN(Number(account))) continue;
-          
-          console.log('Last Balance - Raw:', accountRaw, '-> Normalized:', account);
+            // Account Number is typically at index 1
+            const accountRaw = String(row[1] || '').trim();
+            let account = accountRaw.replace(/\D/g, '');
+            account = account.replace(/^0+/, '') || '0';
+            
+            // Skip if no account number or if it looks like a header/footer
+            if (!account || account === '' || account === '0' || isNaN(Number(account))) continue;
+            
+            console.log('Last Balance - Raw:', accountRaw, '-> Normalized:', account);
             
             // Cust1 Name is typically at index 3
             let name = String(row[3] || '').trim();
@@ -172,12 +214,16 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
             // Address is typically around index 12 (may contain commas)
             let address = String(row[12] || '').trim();
             
-            // Balance is typically at index 10 or 11
-            const balanceRaw = String(row[10] || row[11] || '0').trim();
-            const balance = parseFloat(balanceRaw.replace(/[^0-9.-]/g, '')) || 0;
-            
-            // Date of balance (from filename or current date)
-            const balanceDate = new Date().toISOString().split('T')[0];
+            // Balance - try multiple columns (10, 11, or look for numeric value)
+            let balance = 0;
+            for (const colIdx of [10, 11, 9]) {
+              const balanceRaw = String(row[colIdx] || '0').trim();
+              const parsed = parseFloat(balanceRaw.replace(/[^0-9.-]/g, ''));
+              if (!isNaN(parsed) && parsed > 0) {
+                balance = parsed;
+                break;
+              }
+            }
             
             // BO Name is typically the last column
             const boName = String(row[row.length - 1] || '').trim();
@@ -188,13 +234,13 @@ export const parseLastBalanceCSV = (file: File): Promise<LastBalanceRecord[]> =>
                 name,
                 address,
                 balance,
-                balance_date: balanceDate,
+                balance_date: preparedDate,
                 bo_name: boName
               });
             }
           }
           
-          resolve(records);
+          resolve({ records, preparedDate });
         } catch (error) {
           reject(error);
         }

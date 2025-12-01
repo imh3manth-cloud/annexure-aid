@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
 import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileText, Clock, CheckCircle2, AlertTriangle, TrendingUp, Calendar } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { FileText, Clock, CheckCircle2, AlertTriangle, TrendingUp, Calendar, Download, FileSpreadsheet, Printer, Eye } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import { getConfig } from '@/lib/config';
 
 export const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -15,22 +22,27 @@ export const Dashboard = () => {
   
   const [boStats, setBoStats] = useState<Record<string, { count: number; pending: number }>>({});
   const [agingData, setAgingData] = useState({ week1: 0, week2: 0, week3: 0, older: 0 });
+  const [memos, setMemos] = useState<MemoRecord[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     const loadStats = async () => {
-      const memos = await db.memos.toArray();
+      const allMemos = await db.memos.toArray();
+      setMemos(allMemos);
+      
       setStats({
-        total: memos.length,
-        new: memos.filter(m => m.status === 'New').length,
-        pending: memos.filter(m => m.status === 'Pending').length,
-        verified: memos.filter(m => m.status === 'Verified').length,
-        reported: memos.filter(m => m.status === 'Reported').length,
+        total: allMemos.length,
+        new: allMemos.filter(m => m.status === 'New').length,
+        pending: allMemos.filter(m => m.status === 'Pending').length,
+        verified: allMemos.filter(m => m.status === 'Verified').length,
+        reported: allMemos.filter(m => m.status === 'Reported').length,
         lastUpdated: new Date().toLocaleString()
       });
       
       // Calculate BO-wise stats
       const boData: Record<string, { count: number; pending: number }> = {};
-      memos.forEach(memo => {
+      allMemos.forEach(memo => {
         if (!boData[memo.BO_Name]) {
           boData[memo.BO_Name] = { count: 0, pending: 0 };
         }
@@ -44,7 +56,7 @@ export const Dashboard = () => {
       // Calculate aging data
       const now = new Date();
       const aging = { week1: 0, week2: 0, week3: 0, older: 0 };
-      memos.filter(m => m.status === 'Pending' && m.memo_sent_date).forEach(memo => {
+      allMemos.filter(m => m.status === 'Pending' && m.memo_sent_date).forEach(memo => {
         const sentDate = new Date(memo.memo_sent_date!);
         const daysDiff = Math.floor((now.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
         
@@ -61,11 +73,214 @@ export const Dashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const pendingMemos = memos.filter(m => m.status === 'Pending');
+
+  const exportToExcel = () => {
+    const config = getConfig();
+    const data = Object.entries(boStats).map(([boName, stats]) => ({
+      'Branch Office': boName,
+      'Total Memos': stats.count,
+      'Pending': stats.pending,
+      'Verified': stats.count - stats.pending
+    }));
+    
+    // Add aging summary
+    const agingSummary = [
+      { 'Aging Period': '0-7 Days', 'Count': agingData.week1 },
+      { 'Aging Period': '8-14 Days', 'Count': agingData.week2 },
+      { 'Aging Period': '15-21 Days', 'Count': agingData.week3 },
+      { 'Aging Period': '21+ Days', 'Count': agingData.older },
+    ];
+    
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.json_to_sheet(data);
+    const ws2 = XLSX.utils.json_to_sheet(agingSummary);
+    XLSX.utils.book_append_sheet(wb, ws1, 'BO Summary');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Aging Analysis');
+    XLSX.writeFile(wb, `pendency_report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast({ title: 'Excel exported successfully' });
+  };
+
+  const exportToPDF = () => {
+    const config = getConfig();
+    const doc = new jsPDF();
+    
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pendency Consolidated Report', 105, 15, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`${config.officeName} - ${config.subdivision}`, 105, 22, { align: 'center' });
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
+    
+    // Summary stats
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Summary', 15, 40);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`Total Memos: ${stats.total}`, 15, 48);
+    doc.text(`Pending: ${stats.pending}`, 15, 54);
+    doc.text(`Verified: ${stats.verified}`, 15, 60);
+    doc.text(`Reported: ${stats.reported}`, 15, 66);
+    
+    // BO Summary table
+    let yPos = 80;
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Branch Office Wise Pendency', 15, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Branch Office', 15, yPos);
+    doc.text('Total', 100, yPos);
+    doc.text('Pending', 130, yPos);
+    doc.line(15, yPos + 2, 160, yPos + 2);
+    yPos += 8;
+    
+    doc.setFont('helvetica', 'normal');
+    Object.entries(boStats).forEach(([boName, data]) => {
+      if (yPos > 270) {
+        doc.addPage();
+        yPos = 20;
+      }
+      doc.text(boName.substring(0, 40), 15, yPos);
+      doc.text(String(data.count), 100, yPos);
+      doc.text(String(data.pending), 130, yPos);
+      yPos += 6;
+    });
+    
+    // Aging Analysis
+    yPos += 10;
+    if (yPos > 250) {
+      doc.addPage();
+      yPos = 20;
+    }
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Aging Analysis', 15, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`0-7 Days: ${agingData.week1}`, 15, yPos);
+    doc.text(`8-14 Days: ${agingData.week2}`, 70, yPos);
+    yPos += 6;
+    doc.text(`15-21 Days: ${agingData.week3}`, 15, yPos);
+    doc.text(`21+ Days: ${agingData.older}`, 70, yPos);
+    
+    doc.save(`pendency_report_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast({ title: 'PDF exported successfully' });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
-        <p className="text-muted-foreground mt-1">Overview of high-value withdrawal verifications</p>
+      {/* Preview Dialog */}
+      <Dialog open={showPreview} onOpenChange={setShowPreview}>
+        <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Pendency Consolidated Report</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            {/* Summary */}
+            <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="p-4 rounded-lg bg-primary/10 text-center">
+                <div className="text-2xl font-bold text-primary">{stats.total}</div>
+                <div className="text-xs text-muted-foreground">Total</div>
+              </div>
+              <div className="p-4 rounded-lg bg-amber-500/10 text-center">
+                <div className="text-2xl font-bold text-amber-500">{stats.pending}</div>
+                <div className="text-xs text-muted-foreground">Pending</div>
+              </div>
+              <div className="p-4 rounded-lg bg-green-500/10 text-center">
+                <div className="text-2xl font-bold text-green-500">{stats.verified}</div>
+                <div className="text-xs text-muted-foreground">Verified</div>
+              </div>
+              <div className="p-4 rounded-lg bg-red-500/10 text-center">
+                <div className="text-2xl font-bold text-red-500">{stats.reported}</div>
+                <div className="text-xs text-muted-foreground">Reported</div>
+              </div>
+            </div>
+            
+            {/* BO Summary Table */}
+            <div className="mb-6">
+              <h3 className="font-semibold mb-3">Branch Office Summary</h3>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Branch Office</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Pending</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(boStats).sort().map(([boName, data]) => (
+                    <TableRow key={boName}>
+                      <TableCell>{boName}</TableCell>
+                      <TableCell className="text-right">{data.count}</TableCell>
+                      <TableCell className="text-right font-semibold text-amber-500">{data.pending}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {/* Aging Summary */}
+            <div>
+              <h3 className="font-semibold mb-3">Aging Analysis</h3>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="p-3 rounded-lg bg-green-500/10 text-center">
+                  <div className="text-xl font-bold text-green-500">{agingData.week1}</div>
+                  <div className="text-xs text-muted-foreground">0-7 Days</div>
+                </div>
+                <div className="p-3 rounded-lg bg-blue-500/10 text-center">
+                  <div className="text-xl font-bold text-blue-500">{agingData.week2}</div>
+                  <div className="text-xs text-muted-foreground">8-14 Days</div>
+                </div>
+                <div className="p-3 rounded-lg bg-amber-500/10 text-center">
+                  <div className="text-xl font-bold text-amber-500">{agingData.week3}</div>
+                  <div className="text-xs text-muted-foreground">15-21 Days</div>
+                </div>
+                <div className="p-3 rounded-lg bg-red-500/10 text-center">
+                  <div className="text-xl font-bold text-red-500">{agingData.older}</div>
+                  <div className="text-xs text-muted-foreground">21+ Days</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowPreview(false)}>Close</Button>
+            <Button variant="outline" onClick={handlePrint}>
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </Button>
+            <Button variant="outline" onClick={exportToExcel}>
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Excel
+            </Button>
+            <Button onClick={exportToPDF}>
+              <Download className="w-4 h-4 mr-2" />
+              PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-foreground">Dashboard</h2>
+          <p className="text-muted-foreground mt-1">Overview of high-value withdrawal verifications</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowPreview(true)}>
+            <Eye className="w-4 h-4 mr-2" />
+            Preview & Export
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
