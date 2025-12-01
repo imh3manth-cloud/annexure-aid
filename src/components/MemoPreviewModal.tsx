@@ -59,11 +59,15 @@ export const MemoPreviewModal = ({ open, onOpenChange, memos, onConfirm }: MemoP
           
           <div className="text-xs space-y-2 flex-1">
             <p>
-              No: <span className="font-medium">{memo.serial}</span> dated at {OFFICE_NAME} the {formatDate(memo.txn_date)}
+              No: <span className="font-medium">{memo.serial}</span> dated at {memo.BO_Name} the {formatDate(memo.txn_date)}
             </p>
             
             <p>
-              A withdrawal of Rs <span className="font-medium">{formatAmount(memo.amount)}</span> ({memo.txn_id}) has been effected in Account No <span className="font-medium">{memo.account}</span> with {OFFICE_NAME} on {formatDate(memo.txn_date)}.
+              A withdrawal of Rs <span className="font-medium">{formatAmount(memo.amount)}</span> ({memo.txn_id}) has been effected in Account No <span className="font-medium">{memo.account}</span> at {memo.BO_Name} on {formatDate(memo.txn_date)}.
+            </p>
+            
+            <p className="bg-muted/50 p-1 rounded">
+              Balance after transaction as per Last Balance dated <span className="font-medium">{formatDate(memo.balance_date || memo.txn_date)}</span> is Rs <span className="font-medium">{formatAmount(memo.balance || 0)}</span>.
             </p>
             
             <p>The name and address of depositor are as below:</p>
@@ -76,14 +80,13 @@ export const MemoPreviewModal = ({ open, onOpenChange, memos, onConfirm }: MemoP
             </div>
             
             <p className="pt-2">
-              Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.
+              Kindly verify the genuineness and intimate result within 10/30 days.
             </p>
           </div>
 
           <div className="text-xs mt-4 pt-4 border-t border-border">
-            <div>To,</div>
-            <div>THE INSPECTOR OF POSTS    Sub Postmaster</div>
-            <div>T NARASIPURA SUB DIVISION  {OFFICE_NAME}</div>
+            <div>Sub Postmaster</div>
+            <div>{OFFICE_NAME}</div>
           </div>
         </div>
 

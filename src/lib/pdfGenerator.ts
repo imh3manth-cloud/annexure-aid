@@ -73,14 +73,14 @@ const drawMemo = (
   doc.line(middleX, yOffset + headerHeight, middleX, contentBottom);
   
   // Left column - Memo of Verification (starting after header box)
-  let leftY = yOffset + headerHeight + 4; // Reduced spacing
+  let leftY = yOffset + headerHeight + 4;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Memo of Verification', margin + contentMargin, leftY);
   
-  leftY += 4; // Reduced spacing
+  leftY += 5;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.text(
     `No: ${memo.serial} dated at ${memo.BO_Name} the ${formatDate(memo.txn_date)}`,
     margin + contentMargin,
@@ -88,13 +88,21 @@ const drawMemo = (
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  leftY += 6;
-  const bodyText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} at ${memo.BO_Name} on ${formatDate(memo.txn_date)}. Balance after transaction as per Last Balance dated ${formatDate(memo.balance_date)} is Rs ${formatAmount(memo.balance)}.`;
-  const bodyLines = doc.splitTextToSize(bodyText, columnWidth - (contentMargin * 2));
-  doc.text(bodyLines, margin + contentMargin, leftY);
-  leftY += bodyLines.length * 4;
+  leftY += 5;
+  // First paragraph - withdrawal info
+  const withdrawalText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} at ${memo.BO_Name} on ${formatDate(memo.txn_date)}.`;
+  const withdrawalLines = doc.splitTextToSize(withdrawalText, columnWidth - (contentMargin * 2));
+  doc.text(withdrawalLines, margin + contentMargin, leftY);
+  leftY += withdrawalLines.length * 3.5;
   
-  leftY += 3; // Reduced spacing
+  // Balance info line
+  leftY += 2;
+  const balanceText = `Balance after transaction as per Last Balance dated ${formatDate(memo.balance_date || memo.txn_date)} is Rs ${formatAmount(memo.balance || 0)}.`;
+  const balanceLines = doc.splitTextToSize(balanceText, columnWidth - (contentMargin * 2));
+  doc.text(balanceLines, margin + contentMargin, leftY);
+  leftY += balanceLines.length * 3.5;
+  
+  leftY += 3;
   doc.text('The name and address of depositor are as below:', margin + contentMargin, leftY);
   leftY += 4;
   
@@ -102,14 +110,16 @@ const drawMemo = (
   doc.setFont('helvetica', 'bold');
   const nameLines = doc.splitTextToSize(memo.name, columnWidth - (contentMargin * 2));
   doc.text(nameLines, margin + contentMargin, leftY);
-  leftY += nameLines.length * 4;
+  leftY += nameLines.length * 3.5;
   
   doc.setFont('helvetica', 'normal');
   const addressLines = doc.splitTextToSize(memo.address, columnWidth - (contentMargin * 2));
   doc.text(addressLines, margin + contentMargin, leftY);
-  leftY += addressLines.length * 4;
+  leftY += addressLines.length * 3.5;
   
-  leftY += 3;
+  leftY += 2;
+  doc.setFontSize(7);
+  doc.text('Kindly verify the genuineness and intimate result within 10/30 days.', margin + contentMargin, leftY);
   
   // Draw footer separator line
   const footerY = contentBottom;
@@ -124,11 +134,13 @@ const drawMemo = (
   
   // Right column
   let rightY = yOffset + headerHeight + 4;
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Reply', middleX + contentMargin, rightY);
   
-  rightY += 4; // Reduced spacing
+  rightY += 5;
   doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
   doc.text(
     `No: ${memo.serial} dated at ${memo.BO_Name} the ${formatDate(memo.txn_date)}`,
     middleX + contentMargin,
@@ -136,7 +148,12 @@ const drawMemo = (
     { maxWidth: columnWidth - (contentMargin * 2) }
   );
   
-  rightY += 3;
+  rightY += 6;
+  doc.text('The result of verification has been found', middleX + contentMargin, rightY);
+  rightY += 4;
+  doc.text('satisfactory / not satisfactory.', middleX + contentMargin, rightY);
+  rightY += 6;
+  doc.text('Investigation has been taken up.', middleX + contentMargin, rightY);
   
   // Draw right footer separator
   doc.line(middleX, footerY, pageWidth - margin, footerY);
