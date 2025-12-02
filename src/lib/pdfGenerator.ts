@@ -46,6 +46,9 @@ const drawMemo = (
   // Calculate available height for memo content
   const availableHeight = halfHeight - margin - 5; // 5mm buffer at bottom
   
+  // Calculate body height (excluding header and footer)
+  const bodyHeight = availableHeight - headerHeight - footerHeight;
+  
   // Draw main border for this memo section
   doc.setLineWidth(0.5);
   doc.rect(margin, yOffset, pageWidth - 2 * margin, availableHeight);
@@ -59,21 +62,25 @@ const drawMemo = (
   doc.setFont('helvetica', 'bold');
   doc.text('ANNEXURE-4', margin + columnWidth / 2, yOffset + 5, { align: 'center' });
   doc.setFontSize(10);
-  doc.text('[See para 105]', margin + columnWidth / 2, yOffset + 10, { align: 'center' });
+  doc.text('[See para 105]', margin + columnWidth / 2, yOffset + 9, { align: 'center' });
   
   // Right header (duplicate)
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
   doc.text('ANNEXURE-4', middleX + columnWidth / 2, yOffset + 5, { align: 'center' });
   doc.setFontSize(10);
-  doc.text('[See para 105]', middleX + columnWidth / 2, yOffset + 10, { align: 'center' });
+  doc.text('[See para 105]', middleX + columnWidth / 2, yOffset + 9, { align: 'center' });
   
-  // Draw vertical line separating left and right columns (starting after header)
-  const contentBottom = yOffset + availableHeight - footerHeight;
-  doc.line(middleX, yOffset + headerHeight, middleX, contentBottom);
+  // Draw body separator line (below header)
+  const bodyStartY = yOffset + headerHeight;
+  doc.line(margin, bodyStartY, pageWidth - margin, bodyStartY);
   
-  // Left column - Memo of Verification (starting after header box)
-  let leftY = yOffset + headerHeight + 4;
+  // Draw vertical line separating left and right columns (body section only)
+  const bodyEndY = yOffset + headerHeight + bodyHeight;
+  doc.line(middleX, bodyStartY, middleX, bodyEndY);
+  
+  // Left column - Memo of Verification (body section)
+  let leftY = bodyStartY + 4;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Memo of Verification', margin + contentMargin, leftY);
@@ -89,21 +96,14 @@ const drawMemo = (
   );
   
   leftY += 5;
-  // First paragraph - withdrawal info
+  // Withdrawal info
   const withdrawalText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} at ${memo.BO_Name} on ${formatDate(memo.txn_date)}.`;
   const withdrawalLines = doc.splitTextToSize(withdrawalText, columnWidth - (contentMargin * 2));
   doc.text(withdrawalLines, margin + contentMargin, leftY);
   leftY += withdrawalLines.length * 3.5;
   
-  // Balance info line - MUST come immediately after withdrawal info
-  leftY += 2;
-  const balanceText = `Balance after transaction as per Last Balance dated ${formatDate(memo.balance_date || memo.txn_date)} is Rs ${formatAmount(memo.balance || 0)}.`;
-  const balanceLines = doc.splitTextToSize(balanceText, columnWidth - (contentMargin * 2));
-  doc.text(balanceLines, margin + contentMargin, leftY);
-  leftY += balanceLines.length * 3.5;
-  
-  // Name and address section - comes after balance
-  leftY += 2;
+  // Name and address section
+  leftY += 3;
   doc.text('The name and address of depositor are as below:', margin + contentMargin, leftY);
   leftY += 4;
   
@@ -118,23 +118,19 @@ const drawMemo = (
   doc.text(addressLines, margin + contentMargin, leftY);
   leftY += addressLines.length * 3.5;
   
-  leftY += 2;
+  leftY += 3;
   doc.setFontSize(7);
   doc.text('Kindly verify the genuineness and intimate result within 10/30 days.', margin + contentMargin, leftY);
   
-  // Draw footer separator line
-  const footerY = contentBottom;
-  doc.line(margin, footerY, middleX, footerY);
-  
-  // Footer text with Sub Office name from settings
+  // Signature at bottom of body
+  leftY = bodyEndY - 10;
   doc.setFontSize(8);
-  leftY = footerY + 3;
   doc.text(`Sub Post Master`, margin + contentMargin, leftY);
   leftY += 3;
   doc.text(`${OFFICE_NAME}`, margin + contentMargin, leftY);
   
-  // Right column
-  let rightY = yOffset + headerHeight + 4;
+  // Right column - Reply (body section)
+  let rightY = bodyStartY + 4;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
   doc.text('Reply', middleX + contentMargin, rightY);
@@ -156,16 +152,16 @@ const drawMemo = (
   rightY += 6;
   doc.text('Investigation has been taken up.', middleX + contentMargin, rightY);
   
-  // Draw right footer separator
-  doc.line(middleX, footerY, pageWidth - margin, footerY);
-  
-  // Right footer with Sub Office name
-  rightY = footerY + 3;
+  // Signature at bottom of body
+  rightY = bodyEndY - 10;
   doc.text('Reply under certificate of posting', middleX + contentMargin, rightY);
   rightY += 3;
   doc.text(`Sub Post Master`, middleX + contentMargin, rightY);
   rightY += 3;
   doc.text(`${OFFICE_NAME}`, middleX + contentMargin, rightY);
+  
+  // Draw footer separator line
+  doc.line(margin, bodyEndY, pageWidth - margin, bodyEndY);
   
   // Footer note box spanning full width below the memo
   const noteY = yOffset + availableHeight + 2;
