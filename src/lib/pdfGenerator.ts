@@ -95,14 +95,15 @@ const drawMemo = (
   doc.text(withdrawalLines, margin + contentMargin, leftY);
   leftY += withdrawalLines.length * 3.5;
   
-  // Balance info line
+  // Balance info line - MUST come immediately after withdrawal info
   leftY += 2;
   const balanceText = `Balance after transaction as per Last Balance dated ${formatDate(memo.balance_date || memo.txn_date)} is Rs ${formatAmount(memo.balance || 0)}.`;
   const balanceLines = doc.splitTextToSize(balanceText, columnWidth - (contentMargin * 2));
   doc.text(balanceLines, margin + contentMargin, leftY);
   leftY += balanceLines.length * 3.5;
   
-  leftY += 3;
+  // Name and address section - comes after balance
+  leftY += 2;
   doc.text('The name and address of depositor are as below:', margin + contentMargin, leftY);
   leftY += 4;
   
