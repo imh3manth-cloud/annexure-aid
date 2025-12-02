@@ -143,7 +143,7 @@ const drawMemo = (
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.text(
-    `No: ${memo.serial} dated at ${memo.BO_Name} the ${formatDate(memo.txn_date)}`,
+    `No: ${memo.serial} dated at ${OFFICE_NAME} the ${formatDate(memo.txn_date)}`,
     middleX + contentMargin,
     rightY,
     { maxWidth: columnWidth - (contentMargin * 2) }
@@ -166,6 +166,21 @@ const drawMemo = (
   doc.text(`Sub Post Master`, middleX + contentMargin, rightY);
   rightY += 3;
   doc.text(`${OFFICE_NAME}`, middleX + contentMargin, rightY);
+  
+  // Footer note box spanning full width below the memo
+  const noteY = yOffset + availableHeight + 2;
+  doc.setLineWidth(0.5);
+  doc.rect(margin, noteY, pageWidth - 2 * margin, 8);
+  
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'bold');
+  const noteText = 'Note: ';
+  doc.text(noteText, margin + 2, noteY + 3);
+  
+  doc.setFont('helvetica', 'normal');
+  const noteContent = 'The verification memo should be returned to the HO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of P.R.I and within 30 days in all other cases.';
+  const noteLines = doc.splitTextToSize(noteContent, pageWidth - 2 * margin - 10);
+  doc.text(noteLines, margin + 2 + doc.getTextWidth(noteText), noteY + 3);
 };
 
 // Generate consolidated PDF for multiple memos with summary report
