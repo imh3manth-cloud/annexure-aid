@@ -234,15 +234,37 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
     format: 'a4'
   });
   
-  let pageCount = 0;
+  const config = getConfig();
+  
+  // Cover letter page first
+  doc.setFontSize(14);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Department of Posts, India', 105, 25, { align: 'center' });
+  
+  doc.setFontSize(11);
+  doc.setFont('helvetica', 'normal');
+  let coverY = 50;
+  doc.text('To,', 20, coverY);
+  coverY += 6;
+  doc.text('THE INSPECTOR OF POSTS', 20, coverY);
+  coverY += 6;
+  doc.text(`${config.subdivision.toUpperCase()}`, 20, coverY);
+  
+  coverY += 15;
+  doc.text('Sub: Verification of High Value Wdl Memos - Reg:', 20, coverY);
+  
+  coverY += 12;
+  doc.text('Sir/Madam,', 20, coverY);
+  coverY += 8;
+  doc.text('    The following High Value Wdl Memos are sent herewith for verification and early returns please.', 20, coverY);
+  
+  let pageCount = 1;
   // Fit 2 memos per page (reverted from 3 to avoid overlapping)
   const memosPerPage = 2;
   const memoHeight = 297 / memosPerPage; // Divide page height by 2
   
   for (let i = 0; i < memos.length; i += memosPerPage) {
-    if (pageCount > 0) {
-      doc.addPage();
-    }
+    doc.addPage();
     
     // Draw up to 2 memos per page
     for (let j = 0; j < memosPerPage && i + j < memos.length; j++) {
@@ -266,7 +288,6 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   doc.setFont('helvetica', 'bold');
   doc.text('Consolidated Memo Report', 105, 40, { align: 'center' });
   
-  const config = getConfig();
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   doc.text(`Office: ${config.officeName}`, 105, 48, { align: 'center' });
@@ -414,6 +435,18 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
     
     yPos += rowHeight;
   });
+  
+  // Add Sub Postmaster signature at the end
+  yPos += 15;
+  if (yPos > 260) {
+    doc.addPage();
+    yPos = 40;
+  }
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Sub Postmaster', 175, yPos, { align: 'right' });
+  yPos += 5;
+  doc.text(`${config.officeName} S.O`, 175, yPos, { align: 'right' });
   
   return doc;
 };
