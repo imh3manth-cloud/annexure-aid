@@ -239,24 +239,27 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
   // Cover letter page first
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text('Department of Posts, India', 105, 25, { align: 'center' });
+  doc.text('Department of Posts, India', 105, 20, { align: 'center' });
   
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
-  let coverY = 50;
+  let coverY = 40;
   doc.text('To,', 20, coverY);
-  coverY += 6;
-  doc.text('THE INSPECTOR OF POSTS', 20, coverY);
-  coverY += 6;
-  doc.text(`${config.subdivision.toUpperCase()}`, 20, coverY);
+  coverY += 7;
+  doc.text('The Inspector of Posts,', 20, coverY);
+  coverY += 7;
+  doc.text(`${config.subdivision}`, 20, coverY);
   
-  coverY += 15;
+  coverY += 20;
+  doc.setFont('helvetica', 'bold');
   doc.text('Sub: Verification of High Value Wdl Memos - Reg:', 20, coverY);
   
-  coverY += 12;
-  doc.text('Sir/Madam,', 20, coverY);
-  coverY += 8;
-  doc.text('    The following High Value Wdl Memos are sent herewith for verification and early returns please.', 20, coverY);
+  doc.setFont('helvetica', 'normal');
+  coverY += 15;
+  doc.text('Sir/Madam,', 25, coverY);
+  coverY += 10;
+  const bodyText = 'The following High Value Wdl Memos are sent herewith for verification and early returns please.';
+  doc.text(bodyText, 25, coverY, { maxWidth: 160 });
   
   let pageCount = 1;
   // Fit 2 memos per page (reverted from 3 to avoid overlapping)
@@ -436,17 +439,25 @@ export const generateConsolidatedPDF = (memos: MemoRecord[]): jsPDF => {
     yPos += rowHeight;
   });
   
-  // Add Sub Postmaster signature at the end
-  yPos += 15;
-  if (yPos > 260) {
+  // Add IP addressing and Sub Postmaster signature at the end
+  yPos += 20;
+  if (yPos > 240) {
     doc.addPage();
     yPos = 40;
   }
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('Sub Postmaster', 175, yPos, { align: 'right' });
+  
+  // Left side - To Inspector of Posts
+  doc.text('To', 20, yPos);
   yPos += 5;
-  doc.text(`${config.officeName} S.O`, 175, yPos, { align: 'right' });
+  doc.text('Inspector of Posts,', 20, yPos);
+  yPos += 5;
+  doc.text(`${config.subdivision}`, 20, yPos);
+  
+  // Right side - Sub Postmaster (same line as last IP line)
+  doc.text('Sub Postmaster', 175, yPos - 10, { align: 'right' });
+  doc.text(`${config.officeName} S.O`, 175, yPos - 5, { align: 'right' });
   
   return doc;
 };
