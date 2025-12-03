@@ -80,97 +80,132 @@ const drawMemo = (
   doc.line(middleX, bodyStartY, middleX, bodyEndY);
   
   // Left column - Memo of Verification (body section)
-  let leftY = bodyStartY + 3;
-  doc.setFontSize(10);
+  let leftY = bodyStartY + 4;
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('Memo of Verification', margin + contentMargin, leftY);
+  doc.text('Memo of Verification', margin + columnWidth / 2, leftY, { align: 'center' });
   
   leftY += 4;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.text(
-    `No: ${memo.serial} dated at ${memo.BO_Name} the ${formatDate(memo.txn_date)}`,
-    margin + contentMargin,
+    `No: ${memo.serial} dated at ${OFFICE_NAME} SO the ${formatDate(memo.txn_date)}`,
+    margin + columnWidth / 2,
     leftY,
-    { maxWidth: columnWidth - (contentMargin * 2) }
+    { align: 'center' }
   );
+  
+  // Draw line under sub-header
+  leftY += 2;
+  doc.line(margin, leftY, middleX, leftY);
   
   leftY += 4;
   // Withdrawal info
-  const withdrawalText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} at ${memo.BO_Name} on ${formatDate(memo.txn_date)}.`;
-  const withdrawalLines = doc.splitTextToSize(withdrawalText, columnWidth - (contentMargin * 2));
-  doc.text(withdrawalLines, margin + contentMargin, leftY);
-  leftY += withdrawalLines.length * 3;
+  doc.setFontSize(7);
+  const withdrawalText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} at ${memo.BO_Name} BO in account with ${OFFICE_NAME} S.O on ${formatDate(memo.txn_date)}.`;
+  const withdrawalLines = doc.splitTextToSize(withdrawalText, columnWidth - (contentMargin * 2) - 2);
+  doc.text(withdrawalLines, margin + contentMargin + 1, leftY);
+  leftY += withdrawalLines.length * 2.8;
   
   // Name and address section
-  leftY += 2;
-  doc.text('The name and address of depositor are as below:', margin + contentMargin, leftY);
+  leftY += 1;
+  doc.text('The name and address of depositor are as below:', margin + contentMargin + 1, leftY);
   leftY += 3;
   
-  // Name and address
+  // Draw box for name and address
+  const boxStartY = leftY - 1;
+  const boxWidth = columnWidth - (contentMargin * 2) - 2;
+  
+  // Name with underline label
   doc.setFont('helvetica', 'bold');
-  const nameLines = doc.splitTextToSize(memo.name, columnWidth - (contentMargin * 2));
-  doc.text(nameLines, margin + contentMargin, leftY);
-  leftY += nameLines.length * 3;
-  
+  doc.text('Name', margin + contentMargin + 2, leftY);
   doc.setFont('helvetica', 'normal');
-  const addressLines = doc.splitTextToSize(memo.address, columnWidth - (contentMargin * 2));
-  doc.text(addressLines, margin + contentMargin, leftY);
-  leftY += addressLines.length * 3;
+  doc.text(':', margin + contentMargin + 14, leftY);
+  const nameText = memo.name.toUpperCase();
+  const nameLines = doc.splitTextToSize(nameText, boxWidth - 20);
+  doc.text(nameLines, margin + contentMargin + 17, leftY);
+  leftY += Math.max(nameLines.length * 2.5, 3);
   
-  leftY += 2;
+  // Address with underline label
+  doc.setFont('helvetica', 'bold');
+  doc.text('Address', margin + contentMargin + 2, leftY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(':', margin + contentMargin + 14, leftY);
+  const addressText = memo.address.toUpperCase();
+  const addressLines = doc.splitTextToSize(addressText, boxWidth - 20);
+  doc.text(addressLines, margin + contentMargin + 17, leftY);
+  leftY += Math.max(addressLines.length * 2.5, 3);
+  
+  // Draw the box around name and address
+  const boxEndY = leftY + 1;
+  doc.setLineWidth(0.3);
+  doc.rect(margin + contentMargin + 1, boxStartY - 2, boxWidth, boxEndY - boxStartY + 2);
+  
+  leftY += 3;
   doc.setFontSize(7);
-  doc.text('Kindly verify the genuineness and intimate result within 10/30 days.', margin + contentMargin, leftY);
+  const verifyText = 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.';
+  const verifyLines = doc.splitTextToSize(verifyText, columnWidth - (contentMargin * 2) - 2);
+  doc.text(verifyLines, margin + contentMargin + 1, leftY);
   
-  // Signature section at bottom of body
-  leftY = bodyEndY - 18;
-  doc.setFontSize(8);
-  doc.text('Postmaster', margin + contentMargin + columnWidth - 30, leftY, { align: 'right' });
-  leftY += 4;
-  doc.text('To', margin + contentMargin, leftY);
-  leftY += 3;
-  doc.text('Asst. Superintendent / Inspector Posts / PRI', margin + contentMargin, leftY);
-  leftY += 3;
-  doc.text(`${SUBDIVISION} HO/SO.`, margin + contentMargin, leftY);
+  // Bottom section with To and Signature
+  leftY = bodyEndY - 16;
+  doc.setFontSize(7);
+  doc.text('To', margin + contentMargin + 1, leftY);
+  leftY += 2.5;
+  doc.text('Inspector of Posts,', margin + contentMargin + 1, leftY);
+  leftY += 2.5;
+  doc.text(`${SUBDIVISION}`, margin + contentMargin + 1, leftY);
+  
+  // Sub Post Master on right side
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sub Post Master', margin + columnWidth - contentMargin - 2, leftY - 2.5, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.text(`${OFFICE_NAME} SO`, margin + columnWidth - contentMargin - 2, leftY, { align: 'right' });
   
   // Right column - Reply (body section)
-  let rightY = bodyStartY + 3;
-  doc.setFontSize(10);
+  let rightY = bodyStartY + 4;
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('Reply', middleX + contentMargin, rightY);
+  doc.text('Reply', middleX + columnWidth / 2, rightY, { align: 'center' });
   
   rightY += 4;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.text(
-    `No: ${memo.serial} dated at ${OFFICE_NAME} the ${formatDate(memo.txn_date)}`,
-    middleX + contentMargin,
+    `No: ${memo.serial} dated at ${OFFICE_NAME} SO the ${formatDate(memo.txn_date)}`,
+    middleX + columnWidth / 2,
     rightY,
-    { maxWidth: columnWidth - (contentMargin * 2) }
+    { align: 'center' }
   );
   
-  rightY += 5;
-  doc.text('The result of verification of the withdrawal particularised', middleX + contentMargin, rightY);
-  rightY += 3;
-  doc.text('in the margin has been found satisfactory / not satisfactory.', middleX + contentMargin, rightY);
-  rightY += 5;
-  doc.text('Investigation has been taken up.', middleX + contentMargin, rightY);
+  // Draw line under sub-header
+  rightY += 2;
+  doc.line(middleX, rightY, pageWidth - margin, rightY);
   
-  // Signature section at bottom of body
-  rightY = bodyEndY - 24;
-  doc.text('Asst. Superintendent / Inspector Posts', middleX + contentMargin, rightY);
-  rightY += 3;
-  doc.text('_______________________________', middleX + contentMargin, rightY);
-  rightY += 4;
-  doc.text('Public Relation Inspector', middleX + contentMargin, rightY);
-  rightY += 3;
-  doc.text('_______________________________', middleX + contentMargin, rightY);
   rightY += 5;
-  doc.text('To', middleX + contentMargin, rightY);
-  rightY += 3;
-  doc.text('The Postmaster / Sub Postmaster,', middleX + contentMargin, rightY);
-  rightY += 3;
-  doc.text(`${OFFICE_NAME} HO/SO.`, middleX + contentMargin, rightY);
+  doc.setFontSize(7);
+  const replyText1 = 'The result of verification of the withdrawal particularised in the margin has been found satisfactory / not satisfactory.';
+  const replyLines1 = doc.splitTextToSize(replyText1, columnWidth - (contentMargin * 2) - 2);
+  doc.text(replyLines1, middleX + contentMargin + 1, rightY);
+  rightY += replyLines1.length * 2.8;
+  
+  rightY += 4;
+  doc.text('Investigation has been taken up.', middleX + contentMargin + 1, rightY);
+  
+  // Inspector of Posts centered
+  rightY += 10;
+  doc.text('Inspector of Posts,', middleX + columnWidth / 2, rightY, { align: 'center' });
+  rightY += 2.5;
+  doc.text(`${SUBDIVISION}`, middleX + columnWidth / 2, rightY, { align: 'center' });
+  
+  // Bottom section with To
+  rightY = bodyEndY - 10;
+  doc.setFontSize(7);
+  doc.text('To', middleX + contentMargin + 1, rightY);
+  rightY += 2.5;
+  doc.text('Sub Postmaster', middleX + contentMargin + 1, rightY);
+  rightY += 2.5;
+  doc.text(`${OFFICE_NAME} SO`, middleX + contentMargin + 1, rightY);
   
   // Draw footer separator line
   doc.line(margin, bodyEndY, pageWidth - margin, bodyEndY);
@@ -186,7 +221,7 @@ const drawMemo = (
   doc.text(noteText, margin + 2, noteY + 3);
   
   doc.setFont('helvetica', 'normal');
-  const noteContent = 'The verification memo should be returned to the HO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of P.R.I and within 30 days in all other cases.';
+  const noteContent = 'The verification memo should be returned to the SO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of IP and within 30 days in all other cases.';
   const noteLines = doc.splitTextToSize(noteContent, pageWidth - 2 * margin - 10);
   doc.text(noteLines, margin + 2 + doc.getTextWidth(noteText), noteY + 3);
 };
