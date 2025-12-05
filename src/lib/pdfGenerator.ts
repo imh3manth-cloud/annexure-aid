@@ -707,3 +707,171 @@ export const generateOverdueReportPDF = (memos: MemoRecord[]): jsPDF => {
   
   return doc;
 };
+
+// Get quarter info from a date
+const getQuarterInfo = (date: Date) => {
+  const month = date.getMonth();
+  const year = date.getFullYear();
+  
+  // Quarters: Q1 (Apr-Jun), Q2 (Jul-Sep), Q3 (Oct-Dec), Q4 (Jan-Mar)
+  // Report due: Jan 5 (Q3), Apr 5 (Q4), Jul 5 (Q1), Oct 5 (Q2)
+  if (month >= 0 && month <= 2) {
+    return { quarter: 'Q4', period: `January - March ${year}`, startMonth: 0, endMonth: 2, year };
+  } else if (month >= 3 && month <= 5) {
+    return { quarter: 'Q1', period: `April - June ${year}`, startMonth: 3, endMonth: 5, year };
+  } else if (month >= 6 && month <= 8) {
+    return { quarter: 'Q2', period: `July - September ${year}`, startMonth: 6, endMonth: 8, year };
+  } else {
+    return { quarter: 'Q3', period: `October - December ${year}`, startMonth: 9, endMonth: 11, year };
+  }
+};
+
+// Generate quarterly report to Divisional Superintendent
+export const generateQuarterlyReportPDF = (
+  memos: MemoRecord[],
+  quarterStart: Date,
+  quarterEnd: Date
+): jsPDF => {
+  const config = getConfig();
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+  
+  const quarterInfo = getQuarterInfo(quarterStart);
+  
+  // Filter memos for the quarter
+  const quarterMemos = memos.filter(m => {
+    if (!m.memo_sent_date) return false;
+    const memoDate = new Date(m.memo_sent_date);
+    return memoDate >= quarterStart && memoDate <= quarterEnd;
+  });
+  
+  const verified = quarterMemos.filter(m => m.status === 'Verified');
+  const reported = quarterMemos.filter(m => m.status === 'Reported');
+  const pending = quarterMemos.filter(m => m.status === 'Pending');
+  
+  // Header
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Department of Posts, India', 105, 15, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  let y = 30;
+  doc.text('To,', 20, y);
+  y += 6;
+  doc.text('The Superintendent of Post Offices,', 20, y);
+  y += 6;
+  doc.text(`${config.division}`, 20, y);
+  
+  // Subject
+  y += 12;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sub: Quarterly Report on Verification of High Value Withdrawals', 20, y);
+  y += 6;
+  doc.text(`       (${quarterInfo.period}) - Reg:`, 20, y);
+  
+  y += 10;
+  doc.setFont('helvetica', 'normal');
+  doc.text('Sir/Madam,', 25, y);
+  
+  y += 8;
+  const bodyText = `It is certified that action for verification of withdrawals of Rs.10,000/- and above in savings accounts at Branch Offices through verification memos has been duly completed in time for the quarter ${quarterInfo.period}.`;
+  const bodyLines = doc.splitTextToSize(bodyText, 160);
+  doc.text(bodyLines, 25, y);
+  y += bodyLines.length * 6;
+  
+  // Summary table
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Summary of Verification Memos:', 20, y);
+  
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  
+  // Draw summary box
+  doc.rect(20, y, 170, 50);
+  
+  const summaryData = [
+    ['Total Memos Issued during Quarter', String(quarterMemos.length)],
+    ['Memos Verified', String(verified.length)],
+    ['Cases Reported for Action', String(reported.length)],
+    ['Memos Pending Verification', String(pending.length)],
+    ['Verification Completion Rate', quarterMemos.length > 0 
+      ? `${((verified.length / quarterMemos.length) * 100).toFixed(1)}%` 
+      : 'N/A']
+  ];
+  
+  let tableY = y + 8;
+  summaryData.forEach(([label, value]) => {
+    doc.text(label, 25, tableY);
+    doc.text(':', 130, tableY);
+    doc.text(value, 140, tableY);
+    tableY += 9;
+  });
+  
+  y = tableY + 10;
+  
+  // Branch-wise breakdown
+  if (quarterMemos.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.text('Branch Office Wise Summary:', 20, y);
+    y += 8;
+    
+    // Group by BO
+    const boStats: Record<string, { total: number; verified: number; pending: number; reported: number }> = {};
+    quarterMemos.forEach(m => {
+      const bo = m.BO_Name || 'Unknown';
+      if (!boStats[bo]) boStats[bo] = { total: 0, verified: 0, pending: 0, reported: 0 };
+      boStats[bo].total++;
+      if (m.status === 'Verified') boStats[bo].verified++;
+      else if (m.status === 'Reported') boStats[bo].reported++;
+      else boStats[bo].pending++;
+    });
+    
+    // Table headers
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Branch Office', 25, y);
+    doc.text('Total', 90, y);
+    doc.text('Verified', 110, y);
+    doc.text('Reported', 135, y);
+    doc.text('Pending', 160, y);
+    
+    doc.line(20, y + 2, 190, y + 2);
+    y += 7;
+    
+    doc.setFont('helvetica', 'normal');
+    Object.entries(boStats).sort().forEach(([bo, stats]) => {
+      if (y > 260) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(bo, 25, y, { maxWidth: 60 });
+      doc.text(String(stats.total), 95, y);
+      doc.text(String(stats.verified), 115, y);
+      doc.text(String(stats.reported), 140, y);
+      doc.text(String(stats.pending), 165, y);
+      y += 6;
+    });
+  }
+  
+  // Footer with signature
+  y += 20;
+  if (y > 250) {
+    doc.addPage();
+    y = 40;
+  }
+  
+  doc.setFontSize(10);
+  const reportDate = formatDate(new Date().toISOString().split('T')[0]);
+  doc.text(`Date: ${reportDate}`, 20, y);
+  
+  doc.text('Sub Postmaster', 180, y, { align: 'right' });
+  y += 6;
+  doc.text(`${config.officeName} S.O`, 180, y, { align: 'right' });
+  
+  return doc;
+};
