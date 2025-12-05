@@ -11,12 +11,14 @@ import { Download, Upload, Trash2, Save } from 'lucide-react';
 interface AppConfig {
   officeName: string;
   subdivision: string;
+  division: string;
   boMappings: Record<string, string>;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   officeName: 'OLD SOSALE S.O',
   subdivision: 'T NARASIPURA SUB DIVISION',
+  division: 'MYSORE DIVISION',
   boMappings: {
     '1': 'Chiduravalli BO',
     '2': 'Doddebagilu BO',
@@ -182,12 +184,22 @@ export const Settings = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="subdivision">Subdivision</Label>
+            <Label htmlFor="subdivision">Subdivision (for reminders to IP)</Label>
             <Input
               id="subdivision"
               value={config.subdivision}
               onChange={(e) => setConfig({ ...config, subdivision: e.target.value })}
               placeholder="e.g., T NARASIPURA SUB DIVISION"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="division">Division (for reports to SP)</Label>
+            <Input
+              id="division"
+              value={config.division || ''}
+              onChange={(e) => setConfig({ ...config, division: e.target.value })}
+              placeholder="e.g., MYSORE DIVISION"
             />
           </div>
 

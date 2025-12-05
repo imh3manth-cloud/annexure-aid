@@ -475,26 +475,49 @@ export const generateSingleMemoPDF = (memo: MemoRecord): jsPDF => {
   return doc;
 };
 
-// Generate reminder PDF
+// Generate reminder PDF addressed to Inspector of Posts
 export const generateReminderPDF = (memos: MemoRecord[]): jsPDF => {
+  const config = getConfig();
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
     format: 'a4'
   });
   
-  doc.setFontSize(14);
+  // Header with addressing
+  doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Reminder Report - High Value Withdrawals', 148, 15, { align: 'center' });
+  doc.text('Department of Posts, India', 148, 12, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  let y = 22;
+  doc.text('To,', 10, y);
+  y += 5;
+  doc.text('The Inspector of Posts,', 10, y);
+  y += 5;
+  doc.text(`${config.subdivision}`, 10, y);
+  
+  // Subject
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sub: Reminder for pending High Value Withdrawal Verification Memos - Reg:', 10, y);
+  
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.text('Sir/Madam,', 15, y);
+  y += 6;
+  doc.text('The following High Value Wdl Memos are still pending verification. Kindly expedite and return replies.', 15, y);
   
   // Table headers
-  const startY = 25;
-  const rowHeight = 8;
-  doc.setFontSize(9);
+  y += 10;
+  const startY = y;
+  const rowHeight = 7;
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   
-  const headers = ['Memo No', 'Account No', 'Office', 'Amount', 'Memo Sent Date', 'Reminder Date', 'Remarks'];
-  const colWidths = [20, 30, 45, 25, 30, 30, 87];
+  const headers = ['Memo No', 'Account No', 'Depositor Name', 'Branch Office', 'Amount', 'Memo Sent', 'Reminder No', 'Reminder Date'];
+  const colWidths = [18, 28, 50, 40, 25, 25, 22, 25];
   let x = 10;
   
   headers.forEach((header, i) => {
@@ -507,10 +530,10 @@ export const generateReminderPDF = (memos: MemoRecord[]): jsPDF => {
   
   // Table rows
   doc.setFont('helvetica', 'normal');
-  let y = startY + rowHeight;
+  y = startY + rowHeight;
   
   memos.forEach((memo) => {
-    if (y > 190) {
+    if (y > 185) {
       doc.addPage();
       y = 15;
     }
@@ -522,23 +545,165 @@ export const generateReminderPDF = (memos: MemoRecord[]): jsPDF => {
     doc.text(memo.account, x, y);
     x += colWidths[1];
     
-    doc.text(memo.BO_Name, x, y, { maxWidth: colWidths[2] - 2 });
+    const name = doc.splitTextToSize(memo.name, colWidths[2] - 2);
+    doc.text(name[0] || '', x, y);
     x += colWidths[2];
     
-    doc.text(formatAmount(memo.amount), x, y);
+    doc.text(memo.BO_Name, x, y, { maxWidth: colWidths[3] - 2 });
     x += colWidths[3];
     
-    doc.text(memo.memo_sent_date ? formatDate(memo.memo_sent_date) : '', x, y);
+    doc.text(formatAmount(memo.amount), x, y);
     x += colWidths[4];
     
-    doc.text(memo.last_reminder_date ? formatDate(memo.last_reminder_date) : '', x, y);
+    doc.text(memo.memo_sent_date ? formatDate(memo.memo_sent_date) : '', x, y);
     x += colWidths[5];
     
-    const remarks = doc.splitTextToSize(memo.remarks, colWidths[6] - 2);
-    doc.text(remarks, x, y);
+    doc.text(String(memo.reminder_count), x, y);
+    x += colWidths[6];
     
-    y += Math.max(rowHeight, remarks.length * 4);
+    doc.text(memo.last_reminder_date ? formatDate(memo.last_reminder_date) : '', x, y);
+    
+    y += rowHeight;
   });
+  
+  // Footer with signature
+  y += 15;
+  if (y > 180) {
+    doc.addPage();
+    y = 40;
+  }
+  doc.setFontSize(9);
+  doc.text('To', 10, y);
+  y += 5;
+  doc.text('Inspector of Posts,', 10, y);
+  y += 5;
+  doc.text(`${config.subdivision}`, 10, y);
+  
+  doc.text('Sub Postmaster', 280, y - 10, { align: 'right' });
+  doc.text(`${config.officeName} S.O`, 280, y - 5, { align: 'right' });
+  
+  return doc;
+};
+
+// Generate report to Superintendent for overdue cases
+export const generateOverdueReportPDF = (memos: MemoRecord[]): jsPDF => {
+  const config = getConfig();
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+  });
+  
+  // Header with addressing to Superintendent
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Department of Posts, India', 148, 12, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  let y = 22;
+  doc.text('To,', 10, y);
+  y += 5;
+  doc.text('The Superintendent of Post Offices,', 10, y);
+  y += 5;
+  doc.text(`${config.division}`, 10, y);
+  
+  // Subject
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sub: Report on Overdue High Value Withdrawal Verification Memos - Reg:', 10, y);
+  
+  y += 8;
+  doc.setFont('helvetica', 'normal');
+  doc.text('Sir/Madam,', 15, y);
+  y += 6;
+  const bodyText = 'The following High Value Wdl Memos have not received replies despite reminders. No reply received within 15 days from the date of issue of reminder. Submitted for necessary action please.';
+  const bodyLines = doc.splitTextToSize(bodyText, 260);
+  doc.text(bodyLines, 15, y);
+  y += bodyLines.length * 5;
+  
+  // Table headers
+  y += 8;
+  const startY = y;
+  const rowHeight = 7;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  
+  const headers = ['Memo No', 'Account No', 'Depositor Name', 'Branch Office', 'Amount', 'Memo Sent', 'Reminders', 'Last Reminder', 'Days Overdue'];
+  const colWidths = [18, 28, 45, 38, 23, 23, 20, 23, 22];
+  let x = 10;
+  
+  headers.forEach((header, i) => {
+    doc.text(header, x, startY);
+    x += colWidths[i];
+  });
+  
+  // Draw line under headers
+  doc.line(10, startY + 2, 287, startY + 2);
+  
+  // Table rows
+  doc.setFont('helvetica', 'normal');
+  y = startY + rowHeight;
+  
+  const today = new Date();
+  memos.forEach((memo) => {
+    if (y > 185) {
+      doc.addPage();
+      y = 15;
+    }
+    
+    x = 10;
+    doc.text(String(memo.serial), x, y);
+    x += colWidths[0];
+    
+    doc.text(memo.account, x, y);
+    x += colWidths[1];
+    
+    const name = doc.splitTextToSize(memo.name, colWidths[2] - 2);
+    doc.text(name[0] || '', x, y);
+    x += colWidths[2];
+    
+    doc.text(memo.BO_Name, x, y, { maxWidth: colWidths[3] - 2 });
+    x += colWidths[3];
+    
+    doc.text(formatAmount(memo.amount), x, y);
+    x += colWidths[4];
+    
+    doc.text(memo.memo_sent_date ? formatDate(memo.memo_sent_date) : '', x, y);
+    x += colWidths[5];
+    
+    doc.text(String(memo.reminder_count), x, y);
+    x += colWidths[6];
+    
+    doc.text(memo.last_reminder_date ? formatDate(memo.last_reminder_date) : '', x, y);
+    x += colWidths[7];
+    
+    // Calculate days overdue from last reminder
+    let daysOverdue = 0;
+    if (memo.last_reminder_date) {
+      const lastReminder = new Date(memo.last_reminder_date);
+      daysOverdue = Math.floor((today.getTime() - lastReminder.getTime()) / (1000 * 60 * 60 * 24));
+    }
+    doc.text(String(daysOverdue), x, y);
+    
+    y += rowHeight;
+  });
+  
+  // Footer with signature
+  y += 15;
+  if (y > 180) {
+    doc.addPage();
+    y = 40;
+  }
+  doc.setFontSize(9);
+  doc.text('To', 10, y);
+  y += 5;
+  doc.text('The Superintendent of Post Offices,', 10, y);
+  y += 5;
+  doc.text(`${config.division}`, 10, y);
+  
+  doc.text('Sub Postmaster', 280, y - 10, { align: 'right' });
+  doc.text(`${config.officeName} S.O`, 280, y - 5, { align: 'right' });
   
   return doc;
 };
