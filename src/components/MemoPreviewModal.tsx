@@ -119,7 +119,7 @@ export const MemoPreviewModal = ({ open, onOpenChange, memos, onConfirm }: MemoP
       {/* Footer Box */}
       <div className="border border-border p-2 mt-4 text-center bg-muted/30">
         <div className="text-[10px] leading-tight">
-          <span className="font-semibold">Note:</span> The verification memo should be returned to the HO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of P.R.I and within 30 days in all other cases.
+          <span className="font-semibold">Note:</span> The verification memo should be returned to the HO/SO within 10 days in case where the place of residence of the depositor lies in the jurisdiction of a Public Relations Inspector and within 30 days in all other cases.
         </div>
       </div>
     </div>

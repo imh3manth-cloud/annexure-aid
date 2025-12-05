@@ -221,7 +221,7 @@ const drawMemo = (
   doc.text(noteText, margin + 2, noteY + 3);
   
   doc.setFont('helvetica', 'normal');
-  const noteContent = 'The verification memo should be returned to the SO within 10 days in case where the place of residence of the depositor lies in the jurisdictions of IP and within 30 days in all other cases.';
+  const noteContent = 'The verification memo should be returned to the HO/SO within 10 days in case where the place of residence of the depositor lies in the jurisdiction of a Public Relations Inspector and within 30 days in all other cases.';
   const noteLines = doc.splitTextToSize(noteContent, pageWidth - 2 * margin - 10);
   doc.text(noteLines, margin + 2 + doc.getTextWidth(noteText), noteY + 3);
 };
