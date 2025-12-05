@@ -3,8 +3,64 @@ import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Download } from 'lucide-react';
+import { Download, FileText, Calendar } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
+
+// Get available quarters for selection
+const getQuarterOptions = () => {
+  const options: { value: string; label: string; start: Date; end: Date }[] = [];
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  
+  // Generate last 8 quarters
+  for (let i = 0; i < 8; i++) {
+    const year = currentYear - Math.floor(i / 4);
+    const quarterOffset = i % 4;
+    
+    let quarter: number;
+    let startMonth: number;
+    let endMonth: number;
+    let label: string;
+    
+    // Work backwards from current quarter
+    const currentQuarter = Math.floor(now.getMonth() / 3);
+    const targetQuarter = (currentQuarter - quarterOffset + 4) % 4;
+    const targetYear = year - (quarterOffset > currentQuarter ? 1 : 0);
+    
+    switch (targetQuarter) {
+      case 0: // Jan-Mar (Q4 in fiscal)
+        startMonth = 0; endMonth = 2;
+        label = `Q4 ${targetYear} (Jan-Mar)`;
+        break;
+      case 1: // Apr-Jun (Q1 in fiscal)
+        startMonth = 3; endMonth = 5;
+        label = `Q1 ${targetYear} (Apr-Jun)`;
+        break;
+      case 2: // Jul-Sep (Q2 in fiscal)
+        startMonth = 6; endMonth = 8;
+        label = `Q2 ${targetYear} (Jul-Sep)`;
+        break;
+      default: // Oct-Dec (Q3 in fiscal)
+        startMonth = 9; endMonth = 11;
+        label = `Q3 ${targetYear} (Oct-Dec)`;
+        break;
+    }
+    
+    const start = new Date(targetYear, startMonth, 1);
+    const end = new Date(targetYear, endMonth + 1, 0, 23, 59, 59);
+    
+    options.push({
+      value: `${targetYear}-${startMonth}`,
+      label,
+      start,
+      end
+    });
+  }
+  
+  return options;
+};
 
 export const Reports = () => {
   const [stats, setStats] = useState({
@@ -18,10 +74,16 @@ export const Reports = () => {
       moreThanThree: 0
     }
   });
+  const [selectedQuarter, setSelectedQuarter] = useState<string>('');
+  const quarterOptions = getQuarterOptions();
   const { toast } = useToast();
 
   useEffect(() => {
     loadStats();
+    // Set default quarter to previous quarter
+    if (quarterOptions.length > 1) {
+      setSelectedQuarter(quarterOptions[1].value);
+    }
   }, []);
 
   const loadStats = async () => {
@@ -119,6 +181,33 @@ export const Reports = () => {
     }
   };
 
+  const generateQuarterlyReport = async () => {
+    if (!selectedQuarter) {
+      toast({ title: 'Please select a quarter', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const quarter = quarterOptions.find(q => q.value === selectedQuarter);
+      if (!quarter) return;
+
+      const memos = await db.memos.toArray();
+      
+      const { generateQuarterlyReportPDF } = await import('@/lib/pdfGenerator');
+      const doc = generateQuarterlyReportPDF(memos, quarter.start, quarter.end);
+      
+      const filename = `quarterly_report_${quarter.label.replace(/\s+/g, '_')}.pdf`;
+      doc.save(filename);
+      
+      toast({ 
+        title: 'Quarterly Report Generated', 
+        description: `Report for ${quarter.label} ready for submission to SP` 
+      });
+    } catch (error: any) {
+      toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const exportBackup = async () => {
     try {
       const memos = await db.memos.toArray();
@@ -144,12 +233,80 @@ export const Reports = () => {
     }
   };
 
+  // Get next due date for quarterly report
+  const getNextDueDate = () => {
+    const now = new Date();
+    const month = now.getMonth();
+    const year = now.getFullYear();
+    
+    // Due dates: Jan 5, Apr 5, Jul 5, Oct 5
+    const dueDates = [
+      new Date(year, 0, 5), // Jan 5
+      new Date(year, 3, 5), // Apr 5
+      new Date(year, 6, 5), // Jul 5
+      new Date(year, 9, 5), // Oct 5
+    ];
+    
+    for (const due of dueDates) {
+      if (due > now) {
+        return due.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+    }
+    return new Date(year + 1, 0, 5).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-foreground">Reports</h2>
         <p className="text-muted-foreground mt-1">Export and analyze verification data</p>
       </div>
+
+      {/* Quarterly Report Card - Highlighted */}
+      <Card className="border-primary/50 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-primary" />
+            Quarterly Report to Superintendent
+          </CardTitle>
+          <CardDescription>
+            Due by 5th of January, April, July, October as per POSB CBS Manual
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Next due date:</span>
+            <span className="font-semibold text-primary">{getNextDueDate()}</span>
+          </div>
+          
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <Label>Select Quarter</Label>
+              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select quarter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quarterOptions.map(q => (
+                    <SelectItem key={q.value} value={q.value}>
+                      {q.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={generateQuarterlyReport} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Generate Quarterly Report
+            </Button>
+          </div>
+          
+          <p className="text-xs text-muted-foreground">
+            This report certifies that verification of Rs.10,000/- and above withdrawals at Branch Offices 
+            has been completed for the selected quarter.
+          </p>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
@@ -237,19 +394,6 @@ export const Reports = () => {
           <Button onClick={exportBackup} variant="outline" className="w-full mt-2">
             <Download className="mr-2 h-4 w-4" />
             Full Backup (JSON)
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Backup & Restore</CardTitle>
-          <CardDescription>Create full database backup</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={exportBackup}>
-            <Download className="w-4 h-4 mr-2" />
-            Create Backup (JSON)
           </Button>
         </CardContent>
       </Card>
