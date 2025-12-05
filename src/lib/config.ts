@@ -1,12 +1,14 @@
 interface AppConfig {
   officeName: string;
   subdivision: string;
+  division: string;
   boMappings: Record<string, string>;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
   officeName: 'OLD SOSALE S.O',
   subdivision: 'T NARASIPURA SUB DIVISION',
+  division: 'MYSORE DIVISION',
   boMappings: {
     '1': 'Chiduravalli BO',
     '2': 'Doddebagilu BO',
