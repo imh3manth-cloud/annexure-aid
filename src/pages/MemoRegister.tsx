@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Eye, Printer, FileSpreadsheet } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download } from 'lucide-react';
 import { MemoPreviewModal } from '@/components/MemoPreviewModal';
+import * as XLSX from 'xlsx';
 
 export const MemoRegister = () => {
   const [memos, setMemos] = useState<MemoRecord[]>([]);
@@ -117,6 +118,39 @@ export const MemoRegister = () => {
     reported: memos.filter(m => m.status === 'Reported').length
   };
 
+  const handleExportExcel = () => {
+    const exportData = filteredMemos.map(memo => ({
+      'Memo No.': memo.serial,
+      'Date of Issue': memo.txn_date || '',
+      'Account No.': memo.account,
+      'Name of Depositor': memo.name,
+      'Address': memo.address || '',
+      'Office/Branch': memo.BO_Name || memo.BO_Code || '',
+      'Amount (₹)': memo.amount,
+      'Date of Despatch': memo.memo_sent_date || '',
+      'Date of Reply': memo.verified_date || memo.reported_date || '',
+      'Result': getVerificationResult(memo),
+      'Reminders': memo.reminder_count,
+      'Last Reminder Date': memo.last_reminder_date || '',
+      'Remarks': memo.remarks || '',
+      'Status': memo.status
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Memo Register');
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 25 }, { wch: 30 },
+      { wch: 15 }, { wch: 12 }, { wch: 14 }, { wch: 14 }, { wch: 15 },
+      { wch: 10 }, { wch: 14 }, { wch: 25 }, { wch: 10 }
+    ];
+
+    XLSX.writeFile(wb, `memo_register_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast({ title: 'Excel exported successfully' });
+  };
+
   return (
     <div className="space-y-6">
       <MemoPreviewModal
@@ -133,6 +167,10 @@ export const MemoRegister = () => {
         </div>
         
         <div className="flex gap-2">
+          <Button onClick={handleExportExcel} size="sm" variant="outline">
+            <Download className="w-4 h-4 mr-2" />
+            Export Excel
+          </Button>
           {selected.size > 0 && (
             <Button onClick={handlePreview} size="sm">
               <Printer className="w-4 h-4 mr-2" />
