@@ -1,16 +1,47 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Clock, CheckCircle2, AlertTriangle, TrendingUp, Calendar, Download, FileSpreadsheet, Printer, Eye } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { FileText, Clock, CheckCircle2, AlertTriangle, TrendingUp, Calendar, Download, FileSpreadsheet, Printer, Eye, Bell } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import { getConfig } from '@/lib/config';
 
+// Get next quarterly report due date
+const getNextQuarterlyDueDate = (): { dueDate: Date; quarterLabel: string } => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  
+  // Due dates: 5th of Jan, Apr, Jul, Oct
+  const dueDates = [
+    { month: 0, day: 5, label: 'Q3 (Oct-Dec)' },   // Jan 5
+    { month: 3, day: 5, label: 'Q4 (Jan-Mar)' },   // Apr 5
+    { month: 6, day: 5, label: 'Q1 (Apr-Jun)' },   // Jul 5
+    { month: 9, day: 5, label: 'Q2 (Jul-Sep)' },   // Oct 5
+  ];
+  
+  for (const dd of dueDates) {
+    const dueDate = new Date(year, dd.month, dd.day);
+    if (dueDate > now) {
+      return { dueDate, quarterLabel: dd.label };
+    }
+  }
+  
+  // Next year's first due date
+  return { 
+    dueDate: new Date(year + 1, 0, 5), 
+    quarterLabel: 'Q3 (Oct-Dec)' 
+  };
+};
+
 export const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     total: 0,
     new: 0,
@@ -25,6 +56,23 @@ export const Dashboard = () => {
   const [memos, setMemos] = useState<MemoRecord[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
+  
+  // Check if quarterly report is due within 7 days
+  const quarterlyAlert = useMemo(() => {
+    const { dueDate, quarterLabel } = getNextQuarterlyDueDate();
+    const now = new Date();
+    const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilDue <= 7 && daysUntilDue >= 0) {
+      return {
+        show: true,
+        daysLeft: daysUntilDue,
+        dueDate: dueDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+        quarterLabel
+      };
+    }
+    return { show: false, daysLeft: 0, dueDate: '', quarterLabel: '' };
+  }, []);
 
   useEffect(() => {
     const loadStats = async () => {
@@ -269,6 +317,29 @@ export const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quarterly Report Due Alert */}
+      {quarterlyAlert.show && (
+        <Alert className="border-amber-500/50 bg-amber-500/10">
+          <Bell className="h-5 w-5 text-amber-500" />
+          <AlertTitle className="text-amber-600 dark:text-amber-400 font-semibold">
+            Quarterly Report Due {quarterlyAlert.daysLeft === 0 ? 'Today' : `in ${quarterlyAlert.daysLeft} day${quarterlyAlert.daysLeft > 1 ? 's' : ''}`}!
+          </AlertTitle>
+          <AlertDescription className="flex items-center justify-between">
+            <span className="text-muted-foreground">
+              {quarterlyAlert.quarterLabel} report submission to Divisional Superintendent is due by {quarterlyAlert.dueDate}.
+            </span>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="ml-4 border-amber-500/50 hover:bg-amber-500/20"
+              onClick={() => navigate('/reports')}
+            >
+              Generate Report
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="flex items-center justify-between">
         <div>
