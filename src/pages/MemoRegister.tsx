@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Download, FileText, Eye } from 'lucide-react';
+import { Eye, Printer, FileSpreadsheet } from 'lucide-react';
 import { MemoPreviewModal } from '@/components/MemoPreviewModal';
 
 export const MemoRegister = () => {
@@ -80,12 +80,6 @@ export const MemoRegister = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, any> = {
-      New: 'default',
-      Pending: 'secondary',
-      Verified: 'default',
-      Reported: 'destructive'
-    };
     const colors: Record<string, string> = {
       New: 'bg-primary text-primary-foreground',
       Pending: 'bg-warning text-warning-foreground',
@@ -100,8 +94,28 @@ export const MemoRegister = () => {
     );
   };
 
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    return dateStr;
+  };
+
+  const getVerificationResult = (memo: MemoRecord) => {
+    if (memo.status === 'Verified') return 'Verified';
+    if (memo.status === 'Reported') return 'Reported to SP';
+    return '-';
+  };
+
   const filteredMemos = filter === 'all' ? memos : memos.filter(m => m.status === filter);
   const selectedMemos = memos.filter(m => selected.has(m.id!));
+
+  // Calculate summary stats
+  const stats = {
+    total: memos.length,
+    new: memos.filter(m => m.status === 'New').length,
+    pending: memos.filter(m => m.status === 'Pending').length,
+    verified: memos.filter(m => m.status === 'Verified').length,
+    reported: memos.filter(m => m.status === 'Reported').length
+  };
 
   return (
     <div className="space-y-6">
@@ -111,116 +125,172 @@ export const MemoRegister = () => {
         memos={selectedMemos}
         onConfirm={handleGeneratePDF}
       />
+      
       <div className="flex justify-between items-start">
         <div>
-          <h2 className="text-3xl font-bold text-foreground">Memo Register</h2>
-          <p className="text-muted-foreground mt-1">All verification memos</p>
+          <h2 className="text-3xl font-bold text-foreground">Register of Verification Memos</h2>
+          <p className="text-muted-foreground mt-1">As per POSB CBS Manual format</p>
         </div>
         
         <div className="flex gap-2">
           {selected.size > 0 && (
             <Button onClick={handlePreview} size="sm">
-              <Eye className="w-4 h-4 mr-2" />
-              Preview & Generate PDF ({selected.size})
+              <Printer className="w-4 h-4 mr-2" />
+              Preview & Print ({selected.size})
             </Button>
           )}
         </div>
       </div>
 
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <Card className="bg-card/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+            <div className="text-xs text-muted-foreground">Total Memos</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-primary/10 border-primary/20">
+          <CardContent className="pt-4 pb-3">
+            <div className="text-2xl font-bold text-primary">{stats.new}</div>
+            <div className="text-xs text-muted-foreground">New</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-warning/10 border-warning/20">
+          <CardContent className="pt-4 pb-3">
+            <div className="text-2xl font-bold text-warning">{stats.pending}</div>
+            <div className="text-xs text-muted-foreground">Pending</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-success/10 border-success/20">
+          <CardContent className="pt-4 pb-3">
+            <div className="text-2xl font-bold text-success">{stats.verified}</div>
+            <div className="text-xs text-muted-foreground">Verified</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-destructive/10 border-destructive/20">
+          <CardContent className="pt-4 pb-3">
+            <div className="text-2xl font-bold text-destructive">{stats.reported}</div>
+            <div className="text-xs text-muted-foreground">Reported</div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
-              <CardTitle>Verification Records</CardTitle>
-              <CardDescription>Total: {filteredMemos.length} memos</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5" />
+                Verification Memo Register
+              </CardTitle>
+              <CardDescription>Showing {filteredMemos.length} of {memos.length} records</CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={filter === 'all' ? 'default' : 'outline'}
-                onClick={() => setFilter('all')}
-              >
-                All
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'New' ? 'default' : 'outline'}
-                onClick={() => setFilter('New')}
-              >
-                New
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'Pending' ? 'default' : 'outline'}
-                onClick={() => setFilter('Pending')}
-              >
-                Pending
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'Verified' ? 'default' : 'outline'}
-                onClick={() => setFilter('Verified')}
-              >
-                Verified
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'Reported' ? 'default' : 'outline'}
-                onClick={() => setFilter('Reported')}
-              >
-                Reported
-              </Button>
+            <div className="flex gap-1.5 flex-wrap">
+              {(['all', 'New', 'Pending', 'Verified', 'Reported'] as const).map((status) => (
+                <Button
+                  key={status}
+                  size="sm"
+                  variant={filter === status ? 'default' : 'outline'}
+                  onClick={() => setFilter(status)}
+                  className="text-xs"
+                >
+                  {status === 'all' ? 'All' : status}
+                </Button>
+              ))}
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-10 text-center">
                     <Checkbox
                       checked={selected.size === filteredMemos.length && filteredMemos.length > 0}
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead>Serial</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Account No</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Branch</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Printed</TableHead>
-                  <TableHead>Reminders</TableHead>
+                  <TableHead className="text-center font-semibold w-16">Memo No.</TableHead>
+                  <TableHead className="font-semibold">Date of Issue</TableHead>
+                  <TableHead className="font-semibold">Account No.</TableHead>
+                  <TableHead className="font-semibold">Name of Depositor</TableHead>
+                  <TableHead className="font-semibold">Office/Branch</TableHead>
+                  <TableHead className="text-right font-semibold">Amount (₹)</TableHead>
+                  <TableHead className="font-semibold">Date of Despatch</TableHead>
+                  <TableHead className="font-semibold">Date of Reply</TableHead>
+                  <TableHead className="font-semibold">Result</TableHead>
+                  <TableHead className="font-semibold">Reminders</TableHead>
+                  <TableHead className="font-semibold max-w-[150px]">Remarks</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMemos.map((memo) => (
-                  <TableRow key={memo.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.has(memo.id!)}
-                        onCheckedChange={() => toggleSelect(memo.id!)}
-                      />
+                {filteredMemos.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                      No memos found
                     </TableCell>
-                    <TableCell className="font-medium">{memo.serial}</TableCell>
-                    <TableCell className="text-sm">{memo.txn_date}</TableCell>
-                    <TableCell className="text-sm">{memo.account}</TableCell>
-                    <TableCell className="text-sm max-w-[200px] truncate">{memo.name}</TableCell>
-                    <TableCell className="text-sm">{memo.BO_Name}</TableCell>
-                    <TableCell className="text-sm font-medium">
-                      ₹{memo.amount.toLocaleString('en-IN')}
-                    </TableCell>
-                    <TableCell>{getStatusBadge(memo.status)}</TableCell>
-                    <TableCell>
-                      <Badge variant={memo.printed ? 'default' : 'outline'}>
-                        {memo.printed ? 'Yes' : 'No'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{memo.reminder_count}</TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredMemos.map((memo) => (
+                    <TableRow key={memo.id} className="hover:bg-muted/30">
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={selected.has(memo.id!)}
+                          onCheckedChange={() => toggleSelect(memo.id!)}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center font-mono font-medium">
+                        {memo.serial}
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {memo.txn_date}
+                      </TableCell>
+                      <TableCell className="text-sm font-mono">
+                        {memo.account}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[180px] truncate" title={memo.name}>
+                        {memo.name}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {memo.BO_Name || memo.BO_Code}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium tabular-nums">
+                        {memo.amount.toLocaleString('en-IN')}
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {formatDate(memo.memo_sent_date)}
+                      </TableCell>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {formatDate(memo.verified_date || memo.reported_date)}
+                      </TableCell>
+                      <TableCell>
+                        {memo.status === 'New' || memo.status === 'Pending' ? (
+                          getStatusBadge(memo.status)
+                        ) : (
+                          <span className={`text-sm font-medium ${
+                            memo.status === 'Verified' ? 'text-success' : 'text-destructive'
+                          }`}>
+                            {getVerificationResult(memo)}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {memo.reminder_count > 0 ? (
+                          <Badge variant="outline" className="font-mono">
+                            {memo.reminder_count}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs max-w-[150px] truncate text-muted-foreground" title={memo.remarks}>
+                        {memo.remarks || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
