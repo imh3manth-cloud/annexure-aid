@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { MemoPreviewModal } from '@/components/MemoPreviewModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -22,6 +23,7 @@ export const MemoRegister = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -115,6 +117,7 @@ export const MemoRegister = () => {
   const filteredMemos = useMemo(() => {
     let result = filter === 'all' ? memos : memos.filter(m => m.status === filter);
     
+    // Date range filter
     if (dateFrom || dateTo) {
       result = result.filter(memo => {
         if (!memo.txn_date) return false;
@@ -128,8 +131,17 @@ export const MemoRegister = () => {
       });
     }
     
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      result = result.filter(memo => 
+        memo.account.toLowerCase().includes(query) ||
+        memo.name.toLowerCase().includes(query)
+      );
+    }
+    
     return result;
-  }, [memos, filter, dateFrom, dateTo]);
+  }, [memos, filter, dateFrom, dateTo, searchQuery]);
 
   const selectedMemos = memos.filter(m => selected.has(m.id!));
 
@@ -254,6 +266,17 @@ export const MemoRegister = () => {
               <CardDescription>Showing {filteredMemos.length} of {memos.length} records</CardDescription>
             </div>
             <div className="flex gap-3 flex-wrap items-center">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search account/name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 w-[180px] h-8"
+                />
+              </div>
+
               {/* Date Range Filter */}
               <div className="flex items-center gap-2">
                 <Popover>
