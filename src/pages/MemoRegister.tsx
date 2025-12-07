@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,8 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X } from 'lucide-react';
 import { MemoPreviewModal } from '@/components/MemoPreviewModal';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format, isWithinInterval, parseISO } from 'date-fns';
+import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
 export const MemoRegister = () => {
@@ -16,6 +20,8 @@ export const MemoRegister = () => {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<'all' | 'New' | 'Pending' | 'Verified' | 'Reported'>('all');
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -106,8 +112,31 @@ export const MemoRegister = () => {
     return '-';
   };
 
-  const filteredMemos = filter === 'all' ? memos : memos.filter(m => m.status === filter);
+  const filteredMemos = useMemo(() => {
+    let result = filter === 'all' ? memos : memos.filter(m => m.status === filter);
+    
+    if (dateFrom || dateTo) {
+      result = result.filter(memo => {
+        if (!memo.txn_date) return false;
+        const memoDate = parseISO(memo.txn_date);
+        if (dateFrom && dateTo) {
+          return isWithinInterval(memoDate, { start: dateFrom, end: dateTo });
+        }
+        if (dateFrom) return memoDate >= dateFrom;
+        if (dateTo) return memoDate <= dateTo;
+        return true;
+      });
+    }
+    
+    return result;
+  }, [memos, filter, dateFrom, dateTo]);
+
   const selectedMemos = memos.filter(m => selected.has(m.id!));
+
+  const clearDateFilter = () => {
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
 
   // Calculate summary stats
   const stats = {
@@ -224,18 +253,53 @@ export const MemoRegister = () => {
               </CardTitle>
               <CardDescription>Showing {filteredMemos.length} of {memos.length} records</CardDescription>
             </div>
-            <div className="flex gap-1.5 flex-wrap">
-              {(['all', 'New', 'Pending', 'Verified', 'Reported'] as const).map((status) => (
-                <Button
-                  key={status}
-                  size="sm"
-                  variant={filter === status ? 'default' : 'outline'}
-                  onClick={() => setFilter(status)}
-                  className="text-xs"
-                >
-                  {status === 'all' ? 'All' : status}
-                </Button>
-              ))}
+            <div className="flex gap-3 flex-wrap items-center">
+              {/* Date Range Filter */}
+              <div className="flex items-center gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-[130px] justify-start text-left font-normal", !dateFrom && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateFrom ? format(dateFrom, "dd/MM/yyyy") : "From"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} initialFocus className="pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+                <span className="text-muted-foreground">to</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className={cn("w-[130px] justify-start text-left font-normal", !dateTo && "text-muted-foreground")}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dateTo ? format(dateTo, "dd/MM/yyyy") : "To"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={dateTo} onSelect={setDateTo} initialFocus className="pointer-events-auto" />
+                  </PopoverContent>
+                </Popover>
+                {(dateFrom || dateTo) && (
+                  <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-8 w-8 p-0">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Status Filter */}
+              <div className="flex gap-1.5 flex-wrap">
+                {(['all', 'New', 'Pending', 'Verified', 'Reported'] as const).map((status) => (
+                  <Button
+                    key={status}
+                    size="sm"
+                    variant={filter === status ? 'default' : 'outline'}
+                    onClick={() => setFilter(status)}
+                    className="text-xs"
+                  >
+                    {status === 'all' ? 'All' : status}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
         </CardHeader>
