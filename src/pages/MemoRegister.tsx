@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { MemoPreviewModal } from '@/components/MemoPreviewModal';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -24,6 +25,8 @@ export const MemoRegister = () => {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,10 +49,10 @@ export const MemoRegister = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selected.size === filteredMemos.length) {
+    if (selected.size === paginatedMemos.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(filteredMemos.map(m => m.id!)));
+      setSelected(new Set(paginatedMemos.map(m => m.id!)));
     }
   };
 
@@ -142,6 +145,18 @@ export const MemoRegister = () => {
     
     return result;
   }, [memos, filter, dateFrom, dateTo, searchQuery]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredMemos.length / pageSize);
+  const paginatedMemos = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredMemos.slice(start, start + pageSize);
+  }, [filteredMemos, currentPage, pageSize]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter, dateFrom, dateTo, searchQuery]);
 
   const selectedMemos = memos.filter(m => selected.has(m.id!));
 
@@ -263,7 +278,9 @@ export const MemoRegister = () => {
                 <FileSpreadsheet className="w-5 h-5" />
                 Verification Memo Register
               </CardTitle>
-              <CardDescription>Showing {filteredMemos.length} of {memos.length} records</CardDescription>
+              <CardDescription>
+                Showing {paginatedMemos.length > 0 ? ((currentPage - 1) * pageSize + 1) : 0}-{Math.min(currentPage * pageSize, filteredMemos.length)} of {filteredMemos.length} records
+              </CardDescription>
             </div>
             <div className="flex gap-3 flex-wrap items-center">
               {/* Search */}
@@ -333,7 +350,7 @@ export const MemoRegister = () => {
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-10 text-center">
                     <Checkbox
-                      checked={selected.size === filteredMemos.length && filteredMemos.length > 0}
+                      checked={selected.size === paginatedMemos.length && paginatedMemos.length > 0}
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
@@ -351,14 +368,14 @@ export const MemoRegister = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMemos.length === 0 ? (
+                {paginatedMemos.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       No memos found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredMemos.map((memo) => (
+                  paginatedMemos.map((memo) => (
                     <TableRow key={memo.id} className="hover:bg-muted/30">
                       <TableCell className="text-center">
                         <Checkbox
@@ -419,6 +436,52 @@ export const MemoRegister = () => {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination Controls */}
+          {filteredMemos.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Rows per page:</span>
+                <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(Number(v)); setCurrentPage(1); }}>
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 p-0"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
