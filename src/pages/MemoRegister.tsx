@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { MemoPreviewModal } from '@/components/MemoPreviewModal';
@@ -27,7 +27,34 @@ export const MemoRegister = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [sortColumn, setSortColumn] = useState<string>('serial');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
+
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortableHeader = ({ column, children, className }: { column: string; children: React.ReactNode; className?: string }) => (
+    <TableHead 
+      className={cn("font-semibold cursor-pointer hover:bg-muted/70 select-none", className)}
+      onClick={() => handleSort(column)}
+    >
+      <div className="flex items-center gap-1">
+        {children}
+        {sortColumn === column ? (
+          sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40" />
+        )}
+      </div>
+    </TableHead>
+  );
 
   useEffect(() => {
     loadMemos();
@@ -142,9 +169,63 @@ export const MemoRegister = () => {
         memo.name.toLowerCase().includes(query)
       );
     }
+
+    // Sorting
+    result = [...result].sort((a, b) => {
+      let aVal: any, bVal: any;
+      
+      switch (sortColumn) {
+        case 'serial':
+          aVal = a.serial;
+          bVal = b.serial;
+          break;
+        case 'txn_date':
+          aVal = a.txn_date || '';
+          bVal = b.txn_date || '';
+          break;
+        case 'account':
+          aVal = a.account;
+          bVal = b.account;
+          break;
+        case 'name':
+          aVal = a.name.toLowerCase();
+          bVal = b.name.toLowerCase();
+          break;
+        case 'office':
+          aVal = (a.BO_Name || a.BO_Code || '').toLowerCase();
+          bVal = (b.BO_Name || b.BO_Code || '').toLowerCase();
+          break;
+        case 'amount':
+          aVal = a.amount;
+          bVal = b.amount;
+          break;
+        case 'memo_sent_date':
+          aVal = a.memo_sent_date || '';
+          bVal = b.memo_sent_date || '';
+          break;
+        case 'reply_date':
+          aVal = a.verified_date || a.reported_date || '';
+          bVal = b.verified_date || b.reported_date || '';
+          break;
+        case 'status':
+          aVal = a.status;
+          bVal = b.status;
+          break;
+        case 'reminders':
+          aVal = a.reminder_count;
+          bVal = b.reminder_count;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
     
     return result;
-  }, [memos, filter, dateFrom, dateTo, searchQuery]);
+  }, [memos, filter, dateFrom, dateTo, searchQuery, sortColumn, sortDirection]);
 
   // Pagination
   const totalPages = Math.ceil(filteredMemos.length / pageSize);
@@ -354,16 +435,16 @@ export const MemoRegister = () => {
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="text-center font-semibold w-16">Memo No.</TableHead>
-                  <TableHead className="font-semibold">Date of Issue</TableHead>
-                  <TableHead className="font-semibold">Account No.</TableHead>
-                  <TableHead className="font-semibold">Name of Depositor</TableHead>
-                  <TableHead className="font-semibold">Office/Branch</TableHead>
-                  <TableHead className="text-right font-semibold">Amount (₹)</TableHead>
-                  <TableHead className="font-semibold">Date of Despatch</TableHead>
-                  <TableHead className="font-semibold">Date of Reply</TableHead>
-                  <TableHead className="font-semibold">Result</TableHead>
-                  <TableHead className="font-semibold">Reminders</TableHead>
+                  <SortableHeader column="serial" className="text-center w-16">Memo No.</SortableHeader>
+                  <SortableHeader column="txn_date">Date of Issue</SortableHeader>
+                  <SortableHeader column="account">Account No.</SortableHeader>
+                  <SortableHeader column="name">Name of Depositor</SortableHeader>
+                  <SortableHeader column="office">Office/Branch</SortableHeader>
+                  <SortableHeader column="amount" className="text-right">Amount (₹)</SortableHeader>
+                  <SortableHeader column="memo_sent_date">Date of Despatch</SortableHeader>
+                  <SortableHeader column="reply_date">Date of Reply</SortableHeader>
+                  <SortableHeader column="status">Result</SortableHeader>
+                  <SortableHeader column="reminders">Reminders</SortableHeader>
                   <TableHead className="font-semibold max-w-[150px]">Remarks</TableHead>
                 </TableRow>
               </TableHeader>
