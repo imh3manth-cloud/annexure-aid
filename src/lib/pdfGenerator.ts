@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import { MemoRecord } from './db';
 import { getConfig } from './config';
+import { getPdfConfig, PdfFormatConfig } from './pdfConfig';
 
 // Format date as DD/MM/YYYY
 const formatDate = (dateStr: string): string => {
@@ -31,17 +32,19 @@ const drawMemo = (
   yOffset: number
 ) => {
   const config = getConfig();
+  const pdfConfig = getPdfConfig();
   const OFFICE_NAME = config.officeName;
   const SUBDIVISION = config.subdivision;
   const pageWidth = 210; // A4 width in mm
   const pageHeight = 297; // A4 height in mm
   const halfHeight = pageHeight / 2;
-  const margin = 10;
-  const contentMargin = 2; // Reduced internal margin
+  const margin = pdfConfig.pageMargin;
+  const contentMargin = pdfConfig.contentMargin;
   const columnWidth = (pageWidth - 2 * margin) / 2;
   const middleX = margin + columnWidth;
-  const headerHeight = 10; // Reduced header height
-  const footerHeight = 10; // Reduced footer height
+  const headerHeight = pdfConfig.headerHeight;
+  const footerHeight = pdfConfig.footerHeight;
+  const lineSpacing = pdfConfig.lineSpacing;
   
   // Calculate available height for memo content
   const availableHeight = halfHeight - margin - 5; // 5mm buffer at bottom
@@ -58,18 +61,19 @@ const drawMemo = (
   doc.rect(middleX, yOffset, columnWidth, headerHeight);
   
   // Header - split into left and right boxes
-  doc.setFontSize(12);
+  doc.setFontSize(pdfConfig.headerFontSize);
   doc.setFont('helvetica', 'bold');
-  doc.text('ANNEXURE-4', margin + columnWidth / 2, yOffset + 5, { align: 'center' });
-  doc.setFontSize(10);
-  doc.text('[See para 105]', margin + columnWidth / 2, yOffset + 9, { align: 'center' });
+  const headerYCenter = yOffset + (headerHeight * 0.45);
+  doc.text('ANNEXURE-4', margin + columnWidth / 2, headerYCenter, { align: 'center' });
+  doc.setFontSize(pdfConfig.subHeaderFontSize);
+  doc.text('[See para 105]', margin + columnWidth / 2, headerYCenter + (pdfConfig.headerFontSize * 0.35), { align: 'center' });
   
   // Right header (duplicate)
-  doc.setFontSize(12);
+  doc.setFontSize(pdfConfig.headerFontSize);
   doc.setFont('helvetica', 'bold');
-  doc.text('ANNEXURE-4', middleX + columnWidth / 2, yOffset + 5, { align: 'center' });
-  doc.setFontSize(10);
-  doc.text('[See para 105]', middleX + columnWidth / 2, yOffset + 9, { align: 'center' });
+  doc.text('ANNEXURE-4', middleX + columnWidth / 2, headerYCenter, { align: 'center' });
+  doc.setFontSize(pdfConfig.subHeaderFontSize);
+  doc.text('[See para 105]', middleX + columnWidth / 2, headerYCenter + (pdfConfig.headerFontSize * 0.35), { align: 'center' });
   
   // Draw body separator line (below header)
   const bodyStartY = yOffset + headerHeight;
@@ -80,14 +84,14 @@ const drawMemo = (
   doc.line(middleX, bodyStartY, middleX, bodyEndY);
   
   // Left column - Memo of Verification (body section)
-  let leftY = bodyStartY + 4;
-  doc.setFontSize(9);
+  let leftY = bodyStartY + lineSpacing + 1;
+  doc.setFontSize(pdfConfig.bodyFontSize + 1);
   doc.setFont('helvetica', 'bold');
   doc.text('Memo of Verification', margin + columnWidth / 2, leftY, { align: 'center' });
   
-  leftY += 4;
+  leftY += lineSpacing + 1;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(pdfConfig.bodyFontSize);
   doc.text(
     `No: ${memo.serial} dated at ${OFFICE_NAME} SO the ${formatDate(memo.txn_date)}`,
     margin + columnWidth / 2,
@@ -99,18 +103,18 @@ const drawMemo = (
   leftY += 2;
   doc.line(margin, leftY, middleX, leftY);
   
-  leftY += 4;
+  leftY += lineSpacing + 1;
   // Withdrawal info
-  doc.setFontSize(7);
+  doc.setFontSize(pdfConfig.bodyFontSize);
   const withdrawalText = `A withdrawal of Rs ${formatAmount(memo.amount)} (${memo.txn_id}) has been effected in Account No ${memo.account} at ${memo.BO_Name} BO in account with ${OFFICE_NAME} S.O on ${formatDate(memo.txn_date)}.`;
   const withdrawalLines = doc.splitTextToSize(withdrawalText, columnWidth - (contentMargin * 2) - 2);
   doc.text(withdrawalLines, margin + contentMargin + 1, leftY);
-  leftY += withdrawalLines.length * 2.8;
+  leftY += withdrawalLines.length * lineSpacing;
   
   // Name and address section
-  leftY += 1;
+  leftY += lineSpacing * 0.5;
   doc.text('The name and address of depositor are as below:', margin + contentMargin + 1, leftY);
-  leftY += 3;
+  leftY += lineSpacing;
   
   // Draw box for name and address
   const boxStartY = leftY - 1;
@@ -118,13 +122,14 @@ const drawMemo = (
   
   // Name with underline label
   doc.setFont('helvetica', 'bold');
+  doc.setFontSize(pdfConfig.labelFontSize);
   doc.text('Name', margin + contentMargin + 2, leftY);
   doc.setFont('helvetica', 'normal');
   doc.text(':', margin + contentMargin + 14, leftY);
   const nameText = memo.name.toUpperCase();
   const nameLines = doc.splitTextToSize(nameText, boxWidth - 20);
   doc.text(nameLines, margin + contentMargin + 17, leftY);
-  leftY += Math.max(nameLines.length * 2.5, 3);
+  leftY += Math.max(nameLines.length * lineSpacing, lineSpacing);
   
   // Address with underline label
   doc.setFont('helvetica', 'bold');
@@ -134,43 +139,43 @@ const drawMemo = (
   const addressText = memo.address.toUpperCase();
   const addressLines = doc.splitTextToSize(addressText, boxWidth - 20);
   doc.text(addressLines, margin + contentMargin + 17, leftY);
-  leftY += Math.max(addressLines.length * 2.5, 3);
+  leftY += Math.max(addressLines.length * lineSpacing, lineSpacing);
   
   // Draw the box around name and address
-  const boxEndY = leftY + 1;
+  const boxEndY = leftY + pdfConfig.boxPadding - 2;
   doc.setLineWidth(0.3);
   doc.rect(margin + contentMargin + 1, boxStartY - 2, boxWidth, boxEndY - boxStartY + 2);
   
-  leftY += 3;
-  doc.setFontSize(7);
+  leftY += lineSpacing;
+  doc.setFontSize(pdfConfig.bodyFontSize);
   const verifyText = 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.';
   const verifyLines = doc.splitTextToSize(verifyText, columnWidth - (contentMargin * 2) - 2);
   doc.text(verifyLines, margin + contentMargin + 1, leftY);
   
   // Bottom section with To and Signature
-  leftY = bodyEndY - 16;
-  doc.setFontSize(7);
+  leftY = bodyEndY - (pdfConfig.signatureSpacing * 5);
+  doc.setFontSize(pdfConfig.signatureFontSize);
   doc.text('To', margin + contentMargin + 1, leftY);
-  leftY += 2.5;
+  leftY += pdfConfig.signatureSpacing;
   doc.text('Inspector of Posts,', margin + contentMargin + 1, leftY);
-  leftY += 2.5;
+  leftY += pdfConfig.signatureSpacing;
   doc.text(`${SUBDIVISION}`, margin + contentMargin + 1, leftY);
   
   // Sub Post Master on right side
   doc.setFont('helvetica', 'bold');
-  doc.text('Sub Post Master', margin + columnWidth - contentMargin - 2, leftY - 2.5, { align: 'right' });
+  doc.text('Sub Post Master', margin + columnWidth - contentMargin - 2, leftY - pdfConfig.signatureSpacing, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text(`${OFFICE_NAME} SO`, margin + columnWidth - contentMargin - 2, leftY, { align: 'right' });
   
   // Right column - Reply (body section)
-  let rightY = bodyStartY + 4;
-  doc.setFontSize(9);
+  let rightY = bodyStartY + lineSpacing + 1;
+  doc.setFontSize(pdfConfig.bodyFontSize + 1);
   doc.setFont('helvetica', 'bold');
   doc.text('Reply', middleX + columnWidth / 2, rightY, { align: 'center' });
   
-  rightY += 4;
+  rightY += lineSpacing + 1;
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
+  doc.setFontSize(pdfConfig.bodyFontSize);
   doc.text(
     `No: ${memo.serial} dated at ${OFFICE_NAME} SO the ${formatDate(memo.txn_date)}`,
     middleX + columnWidth / 2,
@@ -182,29 +187,29 @@ const drawMemo = (
   rightY += 2;
   doc.line(middleX, rightY, pageWidth - margin, rightY);
   
-  rightY += 5;
-  doc.setFontSize(7);
+  rightY += lineSpacing + 2;
+  doc.setFontSize(pdfConfig.bodyFontSize);
   const replyText1 = 'The result of verification of the withdrawal particularised in the margin has been found satisfactory / not satisfactory.';
   const replyLines1 = doc.splitTextToSize(replyText1, columnWidth - (contentMargin * 2) - 2);
   doc.text(replyLines1, middleX + contentMargin + 1, rightY);
-  rightY += replyLines1.length * 2.8;
+  rightY += replyLines1.length * lineSpacing;
   
-  rightY += 4;
+  rightY += lineSpacing + 1;
   doc.text('Investigation has been taken up.', middleX + contentMargin + 1, rightY);
   
   // Inspector of Posts centered
-  rightY += 10;
+  rightY += lineSpacing * 3;
   doc.text('Inspector of Posts,', middleX + columnWidth / 2, rightY, { align: 'center' });
-  rightY += 2.5;
+  rightY += pdfConfig.signatureSpacing;
   doc.text(`${SUBDIVISION}`, middleX + columnWidth / 2, rightY, { align: 'center' });
   
   // Bottom section with To
-  rightY = bodyEndY - 10;
-  doc.setFontSize(7);
+  rightY = bodyEndY - (pdfConfig.signatureSpacing * 3.5);
+  doc.setFontSize(pdfConfig.signatureFontSize);
   doc.text('To', middleX + contentMargin + 1, rightY);
-  rightY += 2.5;
+  rightY += pdfConfig.signatureSpacing;
   doc.text('Sub Postmaster', middleX + contentMargin + 1, rightY);
-  rightY += 2.5;
+  rightY += pdfConfig.signatureSpacing;
   doc.text(`${OFFICE_NAME} SO`, middleX + contentMargin + 1, rightY);
   
   // Draw footer separator line
@@ -215,7 +220,7 @@ const drawMemo = (
   doc.setLineWidth(0.5);
   doc.rect(margin, noteY, pageWidth - 2 * margin, 8);
   
-  doc.setFontSize(7);
+  doc.setFontSize(pdfConfig.noteFontSize);
   doc.setFont('helvetica', 'bold');
   const noteText = 'Note: ';
   doc.text(noteText, margin + 2, noteY + 3);
@@ -224,6 +229,49 @@ const drawMemo = (
   const noteContent = 'The verification memo should be returned to the HO/SO within 10 days in case where the place of residence of the depositor lies in the jurisdiction of a Public Relations Inspector and within 30 days in all other cases.';
   const noteLines = doc.splitTextToSize(noteContent, pageWidth - 2 * margin - 10);
   doc.text(noteLines, margin + 2 + doc.getTextWidth(noteText), noteY + 3);
+};
+
+// Generate sample memo PDF for preview
+export const generateSampleMemoPDF = (): jsPDF => {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+  
+  const sampleMemo: MemoRecord = {
+    id: 1,
+    serial: 101,
+    memoKey: 'SAMPLE-001',
+    account: '0100123456789',
+    txn_id: 'TXN2024001234',
+    amount: 25000,
+    txn_date: new Date().toISOString(),
+    name: 'SAMPLE DEPOSITOR NAME',
+    address: '123 Sample Street, Sample Village, Sample District, Karnataka 570001',
+    balance: 50000,
+    balance_date: new Date().toISOString(),
+    BO_Code: 'BO21309111001',
+    BO_Name: 'Sample Branch Office',
+    status: 'New',
+    printed: false,
+    memo_sent_date: null,
+    reminder_count: 0,
+    last_reminder_date: null,
+    verified_date: null,
+    reported_date: null,
+    remarks: '',
+    created_at: new Date().toISOString()
+  };
+  
+  // Draw first memo at top
+  drawMemo(doc, sampleMemo, 5);
+  
+  // Draw second memo at bottom
+  const secondMemo = { ...sampleMemo, serial: 102 };
+  drawMemo(doc, secondMemo, 5 + 297 / 2);
+  
+  return doc;
 };
 
 // Generate consolidated PDF for multiple memos with summary report
