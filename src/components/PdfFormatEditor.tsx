@@ -6,8 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { PdfFormatConfig, getPdfConfig, savePdfConfig, resetPdfConfig, DEFAULT_PDF_CONFIG } from '@/lib/pdfConfig';
-import { RotateCcw, Save, Eye, FileText, Type, MoveVertical, Box } from 'lucide-react';
+import { PdfFormatConfig, getPdfConfig, savePdfConfig, resetPdfConfig, DEFAULT_PDF_CONFIG, PDF_PRESETS, PresetName, applyPreset } from '@/lib/pdfConfig';
+import { RotateCcw, Save, Eye, FileText, Type, MoveVertical, Box, Sparkles } from 'lucide-react';
 import { generateSampleMemoPDF } from '@/lib/pdfGenerator';
 
 interface SliderControlProps {
@@ -50,15 +50,36 @@ const SliderControl = ({ label, value, min, max, step, unit = 'pt', onChange }: 
   </div>
 );
 
+interface PresetButtonProps {
+  presetKey: PresetName;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+const PresetButton = ({ presetKey, isActive, onClick }: PresetButtonProps) => {
+  const preset = PDF_PRESETS[presetKey];
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 p-3 rounded-lg border-2 transition-all text-left ${
+        isActive 
+          ? 'border-primary bg-primary/10' 
+          : 'border-border hover:border-primary/50 hover:bg-muted/50'
+      }`}
+    >
+      <div className="font-medium text-sm">{preset.name}</div>
+      <div className="text-xs text-muted-foreground mt-0.5">{preset.description}</div>
+    </button>
+  );
+};
+
 export const PdfFormatEditor = () => {
   const [config, setConfig] = useState<PdfFormatConfig>(getPdfConfig());
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [activePreset, setActivePreset] = useState<PresetName | null>(null);
   const { toast } = useToast();
 
-  const updateConfig = <K extends keyof PdfFormatConfig>(key: K, value: PdfFormatConfig[K]) => {
-    setConfig(prev => ({ ...prev, [key]: value }));
-  };
 
   const handleSave = () => {
     savePdfConfig(config);
@@ -71,10 +92,27 @@ export const PdfFormatEditor = () => {
   const handleReset = () => {
     resetPdfConfig();
     setConfig(DEFAULT_PDF_CONFIG);
+    setActivePreset('standard');
     toast({
       title: 'Settings Reset',
       description: 'PDF format settings have been reset to defaults.',
     });
+  };
+
+  const handleApplyPreset = (presetKey: PresetName) => {
+    const newConfig = applyPreset(presetKey);
+    setConfig(newConfig);
+    setActivePreset(presetKey);
+    toast({
+      title: 'Preset Applied',
+      description: `${PDF_PRESETS[presetKey].name} preset has been applied.`,
+    });
+  };
+
+  // Clear active preset when user manually changes settings
+  const updateConfig = <K extends keyof PdfFormatConfig>(key: K, value: PdfFormatConfig[K]) => {
+    setConfig(prev => ({ ...prev, [key]: value }));
+    setActivePreset(null);
   };
 
   const generatePreview = useCallback(async () => {
@@ -124,6 +162,31 @@ export const PdfFormatEditor = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Preset Selector */}
+          <div className="mb-6">
+            <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+              <Sparkles className="h-4 w-4" />
+              Quick Presets
+            </Label>
+            <div className="flex gap-3">
+              <PresetButton 
+                presetKey="compact" 
+                isActive={activePreset === 'compact'} 
+                onClick={() => handleApplyPreset('compact')} 
+              />
+              <PresetButton 
+                presetKey="standard" 
+                isActive={activePreset === 'standard'} 
+                onClick={() => handleApplyPreset('standard')} 
+              />
+              <PresetButton 
+                presetKey="large" 
+                isActive={activePreset === 'large'} 
+                onClick={() => handleApplyPreset('large')} 
+              />
+            </div>
+          </div>
+
           <div className="grid gap-6 lg:grid-cols-2">
             {/* Settings Panel */}
             <div className="space-y-4">
