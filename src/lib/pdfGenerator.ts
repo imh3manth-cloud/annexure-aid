@@ -64,16 +64,16 @@ const drawMemo = (
   doc.setFontSize(pdfConfig.headerFontSize);
   doc.setFont('helvetica', 'bold');
   const headerYCenter = yOffset + (headerHeight * 0.45);
-  doc.text('ANNEXURE-4', margin + columnWidth / 2, headerYCenter, { align: 'center' });
+  doc.text(pdfConfig.textContent.headerTitle, margin + columnWidth / 2, headerYCenter, { align: 'center' });
   doc.setFontSize(pdfConfig.subHeaderFontSize);
-  doc.text('[See para 105]', margin + columnWidth / 2, headerYCenter + (pdfConfig.headerFontSize * 0.35), { align: 'center' });
+  doc.text(pdfConfig.textContent.headerSubtitle, margin + columnWidth / 2, headerYCenter + (pdfConfig.headerFontSize * 0.35), { align: 'center' });
   
   // Right header (duplicate)
   doc.setFontSize(pdfConfig.headerFontSize);
   doc.setFont('helvetica', 'bold');
-  doc.text('ANNEXURE-4', middleX + columnWidth / 2, headerYCenter, { align: 'center' });
+  doc.text(pdfConfig.textContent.headerTitle, middleX + columnWidth / 2, headerYCenter, { align: 'center' });
   doc.setFontSize(pdfConfig.subHeaderFontSize);
-  doc.text('[See para 105]', middleX + columnWidth / 2, headerYCenter + (pdfConfig.headerFontSize * 0.35), { align: 'center' });
+  doc.text(pdfConfig.textContent.headerSubtitle, middleX + columnWidth / 2, headerYCenter + (pdfConfig.headerFontSize * 0.35), { align: 'center' });
   
   // Draw body separator line (below header)
   const bodyStartY = yOffset + headerHeight;
@@ -87,7 +87,7 @@ const drawMemo = (
   let leftY = bodyStartY + lineSpacing + 1;
   doc.setFontSize(pdfConfig.bodyFontSize + 1);
   doc.setFont('helvetica', 'bold');
-  doc.text('Memo of Verification', margin + columnWidth / 2, leftY, { align: 'center' });
+  doc.text(pdfConfig.textContent.leftColumnTitle, margin + columnWidth / 2, leftY, { align: 'center' });
   
   leftY += lineSpacing + 1;
   doc.setFont('helvetica', 'normal');
@@ -113,7 +113,7 @@ const drawMemo = (
   
   // Name and address section
   leftY += lineSpacing * 0.5;
-  doc.text('The name and address of depositor are as below:', margin + contentMargin + 1, leftY);
+  doc.text(pdfConfig.textContent.addressSectionLabel, margin + contentMargin + 1, leftY);
   leftY += lineSpacing;
   
   // Draw box for name and address
@@ -148,22 +148,22 @@ const drawMemo = (
   
   leftY += lineSpacing;
   doc.setFontSize(pdfConfig.bodyFontSize);
-  const verifyText = 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.';
+  const verifyText = pdfConfig.textContent.verificationInstruction;
   const verifyLines = doc.splitTextToSize(verifyText, columnWidth - (contentMargin * 2) - 2);
   doc.text(verifyLines, margin + contentMargin + 1, leftY);
   
   // Bottom section with To and Signature
   leftY = bodyEndY - (pdfConfig.signatureSpacing * 5);
   doc.setFontSize(pdfConfig.signatureFontSize);
-  doc.text('To', margin + contentMargin + 1, leftY);
+  doc.text(pdfConfig.textContent.toLabel, margin + contentMargin + 1, leftY);
   leftY += pdfConfig.signatureSpacing;
-  doc.text('Inspector of Posts,', margin + contentMargin + 1, leftY);
+  doc.text(pdfConfig.textContent.inspectorLabel, margin + contentMargin + 1, leftY);
   leftY += pdfConfig.signatureSpacing;
   doc.text(`${SUBDIVISION}`, margin + contentMargin + 1, leftY);
   
   // Sub Post Master on right side
   doc.setFont('helvetica', 'bold');
-  doc.text('Sub Post Master', margin + columnWidth - contentMargin - 2, leftY - pdfConfig.signatureSpacing, { align: 'right' });
+  doc.text(pdfConfig.textContent.subPostmasterLabel, margin + columnWidth - contentMargin - 2, leftY - pdfConfig.signatureSpacing, { align: 'right' });
   doc.setFont('helvetica', 'normal');
   doc.text(`${OFFICE_NAME} SO`, margin + columnWidth - contentMargin - 2, leftY, { align: 'right' });
   
@@ -171,7 +171,7 @@ const drawMemo = (
   let rightY = bodyStartY + lineSpacing + 1;
   doc.setFontSize(pdfConfig.bodyFontSize + 1);
   doc.setFont('helvetica', 'bold');
-  doc.text('Reply', middleX + columnWidth / 2, rightY, { align: 'center' });
+  doc.text(pdfConfig.textContent.rightColumnTitle, middleX + columnWidth / 2, rightY, { align: 'center' });
   
   rightY += lineSpacing + 1;
   doc.setFont('helvetica', 'normal');
@@ -189,24 +189,24 @@ const drawMemo = (
   
   rightY += lineSpacing + 2;
   doc.setFontSize(pdfConfig.bodyFontSize);
-  const replyText1 = 'The result of verification of the withdrawal particularised in the margin has been found satisfactory / not satisfactory.';
+  const replyText1 = pdfConfig.textContent.replyText;
   const replyLines1 = doc.splitTextToSize(replyText1, columnWidth - (contentMargin * 2) - 2);
   doc.text(replyLines1, middleX + contentMargin + 1, rightY);
   rightY += replyLines1.length * lineSpacing;
   
   rightY += lineSpacing + 1;
-  doc.text('Investigation has been taken up.', middleX + contentMargin + 1, rightY);
+  doc.text(pdfConfig.textContent.investigationText, middleX + contentMargin + 1, rightY);
   
   // Inspector of Posts centered
   rightY += lineSpacing * 3;
-  doc.text('Inspector of Posts,', middleX + columnWidth / 2, rightY, { align: 'center' });
+  doc.text(pdfConfig.textContent.inspectorLabel, middleX + columnWidth / 2, rightY, { align: 'center' });
   rightY += pdfConfig.signatureSpacing;
   doc.text(`${SUBDIVISION}`, middleX + columnWidth / 2, rightY, { align: 'center' });
   
   // Bottom section with To
   rightY = bodyEndY - (pdfConfig.signatureSpacing * 3.5);
   doc.setFontSize(pdfConfig.signatureFontSize);
-  doc.text('To', middleX + contentMargin + 1, rightY);
+  doc.text(pdfConfig.textContent.toLabel, middleX + contentMargin + 1, rightY);
   rightY += pdfConfig.signatureSpacing;
   doc.text('Sub Postmaster', middleX + contentMargin + 1, rightY);
   rightY += pdfConfig.signatureSpacing;
@@ -226,7 +226,7 @@ const drawMemo = (
   doc.text(noteText, margin + 2, noteY + 3);
   
   doc.setFont('helvetica', 'normal');
-  const noteContent = 'The verification memo should be returned to the HO/SO within 10 days in case where the place of residence of the depositor lies in the jurisdiction of a Public Relations Inspector and within 30 days in all other cases.';
+  const noteContent = pdfConfig.textContent.noteText;
   const noteLines = doc.splitTextToSize(noteContent, pageWidth - 2 * margin - 10);
   doc.text(noteLines, margin + 2 + doc.getTextWidth(noteText), noteY + 3);
 };
