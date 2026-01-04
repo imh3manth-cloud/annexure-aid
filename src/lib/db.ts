@@ -131,3 +131,16 @@ export const getLastBalanceCount = async (): Promise<number> => {
 export const clearLastBalanceRecords = async (): Promise<void> => {
   await db.lastBalanceRecords.clear();
 };
+
+// Update a single last balance record
+export const updateLastBalanceRecord = async (
+  id: number, 
+  updates: Partial<Omit<LastBalanceRecord, 'id' | 'uploaded_at'>>
+): Promise<void> => {
+  await db.lastBalanceRecords.update(id, updates);
+};
+
+// Delete a single last balance record
+export const deleteLastBalanceRecord = async (id: number): Promise<void> => {
+  await db.lastBalanceRecords.delete(id);
+};
