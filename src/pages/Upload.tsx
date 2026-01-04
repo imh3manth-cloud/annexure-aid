@@ -6,8 +6,18 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { parseHFTIFile, parseLastBalanceCSV, detectBOCode, HFTITransaction, LastBalanceRecord } from '@/lib/fileParser';
-import { db, MemoRecord, initSettings } from '@/lib/db';
-import { Upload as UploadIcon, FileSpreadsheet } from 'lucide-react';
+import { 
+  db, 
+  MemoRecord, 
+  initSettings, 
+  saveLastBalanceRecords, 
+  getAllLastBalanceRecords, 
+  getLastBalanceCount,
+  getLastBalanceDate,
+  clearLastBalanceRecords 
+} from '@/lib/db';
+import { Upload as UploadIcon, FileSpreadsheet, Database, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const Upload = () => {
   const [hftiFile, setHftiFile] = useState<File | null>(null);
@@ -16,24 +26,49 @@ export const Upload = () => {
   const [groupByBO, setGroupByBO] = useState(true);
   const [preview, setPreview] = useState<any>(null);
   const [processing, setProcessing] = useState(false);
-  const [uploadHistory, setUploadHistory] = useState<any[]>([]);
-  const [useExistingBalance, setUseExistingBalance] = useState(false);
+  const [savedBalanceInfo, setSavedBalanceInfo] = useState<{ count: number; date: string | null }>({ count: 0, date: null });
+  const [missingAccounts, setMissingAccounts] = useState<string[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    loadUploadHistory();
+    loadSavedBalanceInfo();
   }, []);
 
-  const loadUploadHistory = async () => {
-    const history = await db.lastBalanceUploads.orderBy('uploadDate').reverse().limit(10).toArray();
-    setUploadHistory(history);
+  const loadSavedBalanceInfo = async () => {
+    const count = await getLastBalanceCount();
+    const date = await getLastBalanceDate();
+    setSavedBalanceInfo({ count, date });
+  };
+
+  const handleClearSavedBalance = async () => {
+    if (confirm('Are you sure you want to clear all saved balance data? You will need to upload again.')) {
+      await clearLastBalanceRecords();
+      await loadSavedBalanceInfo();
+      toast({
+        title: 'Cleared',
+        description: 'Saved balance data has been cleared'
+      });
+    }
   };
 
   const handlePreview = async () => {
-    if (!hftiFile || balanceFiles.length === 0) {
+    if (!hftiFile) {
       toast({
-        title: 'Missing files',
-        description: 'Please upload HFTI file and at least one Last Balance file',
+        title: 'Missing HFTI file',
+        description: 'Please upload HFTI transaction file',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    // Check if we have saved balance data or new files
+    const savedRecords = await getAllLastBalanceRecords();
+    const hasNewBalanceFiles = balanceFiles.length > 0;
+    
+    if (savedRecords.length === 0 && !hasNewBalanceFiles) {
+      toast({
+        title: 'No balance data',
+        description: 'Please upload Last Balance file(s) - no saved data found',
         variant: 'destructive'
       });
       return;
@@ -41,51 +76,76 @@ export const Upload = () => {
 
     setProcessing(true);
     try {
-      // Parse files
+      // Parse HFTI
       const transactions = await parseHFTIFile(hftiFile);
       
-      const balanceRecords: LastBalanceRecord[] = [];
+      // Build account map from saved data first
+      const accountMap = new Map<string, LastBalanceRecord>();
       let latestPreparedDate = '';
       
+      // Add saved records to map
+      savedRecords.forEach(rec => {
+        let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+        accountMap.set(normalizedAccount, {
+          account: rec.account,
+          name: rec.name,
+          address: rec.address,
+          balance: rec.balance,
+          balance_date: rec.balance_date,
+          bo_name: rec.bo_name
+        });
+        if (!latestPreparedDate || rec.balance_date > latestPreparedDate) {
+          latestPreparedDate = rec.balance_date;
+        }
+      });
+      
+      // Parse and add new balance files (if provided)
+      const newBalanceRecords: LastBalanceRecord[] = [];
       for (const file of balanceFiles) {
         const { records, preparedDate } = await parseLastBalanceCSV(file);
-        balanceRecords.push(...records);
+        newBalanceRecords.push(...records);
+        
+        records.forEach(rec => {
+          let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+          accountMap.set(normalizedAccount, rec);
+        });
+        
         if (!latestPreparedDate || preparedDate > latestPreparedDate) {
           latestPreparedDate = preparedDate;
         }
-        
-        // Save to upload history
-        await db.lastBalanceUploads.add({
-          filename: file.name,
-          uploadDate: new Date().toISOString(),
-          recordCount: records.length
-        });
       }
       
-      // Reload upload history
-      loadUploadHistory();
-
-      // Create account lookup with normalized account numbers (remove leading zeros)
-      const accountMap = new Map<string, LastBalanceRecord>();
-      balanceRecords.forEach(rec => {
-        // Normalize: remove non-numeric and leading zeros
-        let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
-        accountMap.set(normalizedAccount, rec);
-        console.log('AccountMap - Adding:', normalizedAccount, '-> Name:', rec.name, 'Balance:', rec.balance, 'Date:', rec.balance_date);
-      });
-      
-      console.log('Total accounts in map:', accountMap.size);
+      // Save new balance records to database for future use
+      if (newBalanceRecords.length > 0) {
+        const savedCount = await saveLastBalanceRecords(newBalanceRecords.map(r => ({
+          account: r.account,
+          name: r.name,
+          address: r.address,
+          balance: r.balance,
+          balance_date: r.balance_date,
+          bo_name: r.bo_name
+        })));
+        
+        await loadSavedBalanceInfo();
+        
+        toast({
+          title: 'Balance data saved',
+          description: `Saved ${savedCount} balance records for future use`
+        });
+      }
 
       // Filter by threshold and merge data
+      const missingAccountsList: string[] = [];
       const candidates = transactions
         .filter(t => t.amount >= threshold)
         .map(t => {
-          // Normalize: remove non-numeric and leading zeros
           let normalizedAccount = t.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
           const balanceData = accountMap.get(normalizedAccount);
           const bo = detectBOCode(t.particulars);
           
-          console.log('Looking up:', normalizedAccount, '-> Found:', balanceData?.name || 'NOT FOUND', 'Balance:', balanceData?.balance);
+          if (!balanceData) {
+            missingAccountsList.push(t.account);
+          }
           
           return {
             txn_date: t.txn_date,
@@ -98,9 +158,12 @@ export const Upload = () => {
             balance_date: balanceData?.balance_date || latestPreparedDate || t.txn_date,
             BO_Code: bo.code,
             BO_Name: bo.name,
-            particulars: t.particulars
+            particulars: t.particulars,
+            hasBalanceData: !!balanceData
           };
         });
+
+      setMissingAccounts([...new Set(missingAccountsList)]);
 
       // Check for duplicates
       const existing = await db.memos.toArray();
@@ -112,19 +175,31 @@ export const Upload = () => {
       });
 
       const duplicates = candidates.length - newCandidates.length;
+      const withBalanceData = newCandidates.filter(c => c.hasBalanceData).length;
+      const withoutBalanceData = newCandidates.length - withBalanceData;
 
       setPreview({
         total: candidates.length,
         new: newCandidates.length,
         duplicates,
+        withBalanceData,
+        withoutBalanceData,
         samples: newCandidates.slice(0, 5),
         preparedDate: latestPreparedDate
       });
 
-      toast({
-        title: 'Preview ready',
-        description: `Found ${newCandidates.length} new transactions (${duplicates} duplicates skipped). Balance date: ${latestPreparedDate}`
-      });
+      if (missingAccountsList.length > 0) {
+        toast({
+          title: 'Preview ready with warnings',
+          description: `Found ${newCandidates.length} new transactions. ${missingAccountsList.length} accounts missing balance data.`,
+          variant: 'default'
+        });
+      } else {
+        toast({
+          title: 'Preview ready',
+          description: `Found ${newCandidates.length} new transactions (${duplicates} duplicates skipped)`
+        });
+      }
     } catch (error: any) {
       toast({
         title: 'Preview failed',
@@ -145,25 +220,40 @@ export const Upload = () => {
       const settings = await db.settings.get('app');
       let lastSerial = settings?.lastSerial || 0;
 
-      // Parse files again
+      // Parse HFTI again
       const transactions = await parseHFTIFile(hftiFile!);
-      const balanceRecords: LastBalanceRecord[] = [];
+      
+      // Build account map from saved data
+      const savedRecords = await getAllLastBalanceRecords();
+      const accountMap = new Map<string, LastBalanceRecord>();
       let latestPreparedDate = '';
       
+      savedRecords.forEach(rec => {
+        let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+        accountMap.set(normalizedAccount, {
+          account: rec.account,
+          name: rec.name,
+          address: rec.address,
+          balance: rec.balance,
+          balance_date: rec.balance_date,
+          bo_name: rec.bo_name
+        });
+        if (!latestPreparedDate || rec.balance_date > latestPreparedDate) {
+          latestPreparedDate = rec.balance_date;
+        }
+      });
+      
+      // Also include any new files uploaded during this session
       for (const file of balanceFiles) {
         const { records, preparedDate } = await parseLastBalanceCSV(file);
-        balanceRecords.push(...records);
+        records.forEach(rec => {
+          let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+          accountMap.set(normalizedAccount, rec);
+        });
         if (!latestPreparedDate || preparedDate > latestPreparedDate) {
           latestPreparedDate = preparedDate;
         }
       }
-
-      // Use normalized account numbers for lookup
-      const accountMap = new Map<string, LastBalanceRecord>();
-      balanceRecords.forEach(rec => {
-        let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
-        accountMap.set(normalizedAccount, rec);
-      });
 
       // Get existing memos
       const existing = await db.memos.toArray();
@@ -257,6 +347,7 @@ export const Upload = () => {
       setHftiFile(null);
       setBalanceFiles([]);
       setPreview(null);
+      setMissingAccounts([]);
     } catch (error: any) {
       toast({
         title: 'Commit failed',
@@ -275,14 +366,64 @@ export const Upload = () => {
         <p className="text-muted-foreground mt-1">Upload HFTI transactions and Last Balance reports</p>
       </div>
 
+      {/* Saved Balance Data Info */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Database className="h-5 w-5 text-primary" />
+            Saved Balance Data
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {savedBalanceInfo.count > 0 ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">
+                  {savedBalanceInfo.count.toLocaleString()} accounts saved
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Balance date: {savedBalanceInfo.date || 'Unknown'}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={loadSavedBalanceInfo}
+                  title="Refresh"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={handleClearSavedBalance}
+                  title="Clear saved data"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No saved balance data. Upload Last Balance file(s) below.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>File Upload</CardTitle>
-          <CardDescription>Select HFTI Excel file and Last Balance CSV files</CardDescription>
+          <CardDescription>
+            {savedBalanceInfo.count > 0 
+              ? 'Upload HFTI file. Last Balance is optional - will use saved data.'
+              : 'Upload HFTI file and Last Balance CSV file(s)'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="hfti">HFTI Transaction File (Excel)</Label>
+            <Label htmlFor="hfti">HFTI Transaction File (Excel) *</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="hfti"
@@ -290,12 +431,17 @@ export const Upload = () => {
                 accept=".xlsx,.xls"
                 onChange={(e) => setHftiFile(e.target.files?.[0] || null)}
               />
-              {hftiFile && <FileSpreadsheet className="w-5 h-5 text-success" />}
+              {hftiFile && <FileSpreadsheet className="w-5 h-5 text-green-500" />}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="balance">Last Balance Files (CSV - multiple allowed)</Label>
+            <Label htmlFor="balance">
+              Last Balance Files (CSV) 
+              {savedBalanceInfo.count > 0 
+                ? ' - Optional, only for new/updated accounts' 
+                : ' *'}
+            </Label>
             <div className="flex items-center gap-2">
               <Input
                 id="balance"
@@ -305,9 +451,14 @@ export const Upload = () => {
                 onChange={(e) => setBalanceFiles(Array.from(e.target.files || []))}
               />
               {balanceFiles.length > 0 && (
-                <span className="text-sm text-success">{balanceFiles.length} files</span>
+                <span className="text-sm text-green-500">{balanceFiles.length} files</span>
               )}
             </div>
+            {savedBalanceInfo.count > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Uploading new files will add/update the saved balance data
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -330,7 +481,10 @@ export const Upload = () => {
           </div>
 
           <div className="flex gap-2">
-            <Button onClick={handlePreview} disabled={processing || !hftiFile || balanceFiles.length === 0}>
+            <Button 
+              onClick={handlePreview} 
+              disabled={processing || !hftiFile || (savedBalanceInfo.count === 0 && balanceFiles.length === 0)}
+            >
               <UploadIcon className="w-4 h-4 mr-2" />
               Preview Detection
             </Button>
@@ -343,63 +497,29 @@ export const Upload = () => {
         </CardContent>
       </Card>
 
-      {/* Last Balance Upload History */}
-      {uploadHistory.length > 0 && (
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileSpreadsheet className="h-5 w-5 text-accent" />
-              Last Balance Upload History
-            </CardTitle>
-            <CardDescription>Recent last balance file uploads - select to reuse</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  id="useExisting"
-                  checked={useExistingBalance}
-                  onChange={(e) => setUseExistingBalance(e.target.checked)}
-                  className="h-4 w-4"
-                />
-                <Label htmlFor="useExisting">Use previously uploaded last balance data</Label>
-              </div>
-              
-              {useExistingBalance && (
-                <div className="grid gap-3 mt-4">
-                  {uploadHistory.map((upload) => (
-                    <div
-                      key={upload.id}
-                      className="p-4 rounded-lg border border-border bg-muted/30 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-sm">{upload.filename}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(upload.uploadDate).toLocaleDateString()} - {upload.recordCount} records
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            toast({
-                              title: 'Using previous data',
-                              description: `Using ${upload.filename} for balance information`
-                            });
-                          }}
-                        >
-                          Use This
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+      {/* Missing Accounts Warning */}
+      {missingAccounts.length > 0 && (
+        <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+          <AlertCircle className="h-4 w-4 text-amber-500" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-medium text-amber-700 dark:text-amber-400">
+                {missingAccounts.length} accounts not found in balance data
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Upload a Last Balance file containing these accounts to get their name/address/balance info.
+              </p>
+              <details className="text-xs">
+                <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                  View missing accounts
+                </summary>
+                <div className="mt-2 p-2 bg-muted rounded max-h-32 overflow-y-auto">
+                  {missingAccounts.join(', ')}
                 </div>
-              )}
+              </details>
             </div>
-          </CardContent>
-        </Card>
+          </AlertDescription>
+        </Alert>
       )}
 
       {preview && (
@@ -409,7 +529,7 @@ export const Upload = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center p-4 bg-muted rounded-lg">
                   <div className="text-2xl font-bold">{preview.total}</div>
                   <div className="text-sm text-muted-foreground">Total Detected</div>
@@ -418,19 +538,30 @@ export const Upload = () => {
                   <div className="text-2xl font-bold text-primary">{preview.new}</div>
                   <div className="text-sm text-muted-foreground">New Memos</div>
                 </div>
-                <div className="text-center p-4 bg-warning/10 rounded-lg">
-                  <div className="text-2xl font-bold text-warning">{preview.duplicates}</div>
-                  <div className="text-sm text-muted-foreground">Duplicates</div>
+                <div className="text-center p-4 bg-green-500/10 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{preview.withBalanceData}</div>
+                  <div className="text-sm text-muted-foreground">With Balance Data</div>
+                </div>
+                <div className="text-center p-4 bg-amber-500/10 rounded-lg">
+                  <div className="text-2xl font-bold text-amber-600">{preview.withoutBalanceData}</div>
+                  <div className="text-sm text-muted-foreground">Missing Data</div>
                 </div>
               </div>
+
+              {preview.duplicates > 0 && (
+                <p className="text-sm text-muted-foreground text-center">
+                  {preview.duplicates} duplicate transactions skipped
+                </p>
+              )}
 
               {preview.samples.length > 0 && (
                 <div className="space-y-2">
                   <h4 className="font-semibold">Sample Records:</h4>
                   <div className="text-sm space-y-1 text-muted-foreground">
                     {preview.samples.map((s: any, i: number) => (
-                      <div key={i} className="p-2 bg-muted rounded">
+                      <div key={i} className={`p-2 rounded ${s.hasBalanceData ? 'bg-muted' : 'bg-amber-500/10'}`}>
                         {s.account} - {s.name} - ₹{s.amount} - {s.BO_Name}
+                        {!s.hasBalanceData && <span className="ml-2 text-xs text-amber-600">(no balance data)</span>}
                       </div>
                     ))}
                   </div>
