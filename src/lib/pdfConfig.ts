@@ -1,5 +1,29 @@
 // PDF Format Configuration
 
+export interface PdfTextConfig {
+  // Headers
+  headerTitle: string;
+  headerSubtitle: string;
+  
+  // Left column (Memo of Verification)
+  leftColumnTitle: string;
+  verificationInstruction: string;
+  addressSectionLabel: string;
+  
+  // Right column (Reply)
+  rightColumnTitle: string;
+  replyText: string;
+  investigationText: string;
+  
+  // Footer note
+  noteText: string;
+  
+  // Signature labels
+  toLabel: string;
+  inspectorLabel: string;
+  subPostmasterLabel: string;
+}
+
 export interface PdfFormatConfig {
   // Page settings
   pageMargin: number;
@@ -26,6 +50,9 @@ export interface PdfFormatConfig {
   // Signature section
   signatureFontSize: number;
   signatureSpacing: number;
+  
+  // Text content
+  textContent: PdfTextConfig;
 }
 
 export type PresetName = 'compact' | 'standard' | 'large';
@@ -35,6 +62,21 @@ export interface PdfPreset {
   description: string;
   config: PdfFormatConfig;
 }
+
+export const DEFAULT_TEXT_CONFIG: PdfTextConfig = {
+  headerTitle: 'ANNEXURE-4',
+  headerSubtitle: '[See para 105]',
+  leftColumnTitle: 'Memo of Verification',
+  verificationInstruction: 'Kindly verify the genuineness of the withdrawal by contacting the depositor and intimate result within 10/30 days.',
+  addressSectionLabel: 'The name and address of depositor are as below:',
+  rightColumnTitle: 'Reply',
+  replyText: 'The result of verification of the withdrawal particularised in the margin has been found satisfactory / not satisfactory.',
+  investigationText: 'Investigation has been taken up.',
+  noteText: 'The verification memo should be returned to the HO/SO within 10 days in case where the place of residence of the depositor lies in the jurisdiction of a Public Relations Inspector and within 30 days in all other cases.',
+  toLabel: 'To',
+  inspectorLabel: 'Inspector of Posts,',
+  subPostmasterLabel: 'Sub Post Master'
+};
 
 export const COMPACT_CONFIG: PdfFormatConfig = {
   pageMargin: 8,
@@ -50,7 +92,8 @@ export const COMPACT_CONFIG: PdfFormatConfig = {
   footerFontSize: 7,
   noteFontSize: 6,
   signatureFontSize: 7,
-  signatureSpacing: 2
+  signatureSpacing: 2,
+  textContent: DEFAULT_TEXT_CONFIG
 };
 
 export const DEFAULT_PDF_CONFIG: PdfFormatConfig = {
@@ -67,7 +110,8 @@ export const DEFAULT_PDF_CONFIG: PdfFormatConfig = {
   footerFontSize: 8,
   noteFontSize: 7,
   signatureFontSize: 8,
-  signatureSpacing: 3
+  signatureSpacing: 3,
+  textContent: DEFAULT_TEXT_CONFIG
 };
 
 export const LARGE_PRINT_CONFIG: PdfFormatConfig = {
@@ -84,7 +128,8 @@ export const LARGE_PRINT_CONFIG: PdfFormatConfig = {
   footerFontSize: 10,
   noteFontSize: 9,
   signatureFontSize: 10,
-  signatureSpacing: 4
+  signatureSpacing: 4,
+  textContent: DEFAULT_TEXT_CONFIG
 };
 
 export const PDF_PRESETS: Record<PresetName, PdfPreset> = {
@@ -111,7 +156,12 @@ export const getPdfConfig = (): PdfFormatConfig => {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved) {
     try {
-      return { ...DEFAULT_PDF_CONFIG, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      return { 
+        ...DEFAULT_PDF_CONFIG, 
+        ...parsed,
+        textContent: { ...DEFAULT_TEXT_CONFIG, ...parsed.textContent }
+      };
     } catch {
       return DEFAULT_PDF_CONFIG;
     }

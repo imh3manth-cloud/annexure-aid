@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { PdfFormatConfig, getPdfConfig, savePdfConfig, resetPdfConfig, DEFAULT_PDF_CONFIG, PDF_PRESETS, PresetName, applyPreset } from '@/lib/pdfConfig';
-import { RotateCcw, Save, Eye, FileText, Type, MoveVertical, Box, Sparkles } from 'lucide-react';
+import { PdfFormatConfig, PdfTextConfig, getPdfConfig, savePdfConfig, resetPdfConfig, DEFAULT_PDF_CONFIG, DEFAULT_TEXT_CONFIG, PDF_PRESETS, PresetName, applyPreset } from '@/lib/pdfConfig';
+import { RotateCcw, Save, Eye, FileText, Type, MoveVertical, Box, Sparkles, MessageSquare } from 'lucide-react';
 import { generateSampleMemoPDF } from '@/lib/pdfGenerator';
 
 interface SliderControlProps {
@@ -115,6 +116,14 @@ export const PdfFormatEditor = () => {
     setActivePreset(null);
   };
 
+  const updateTextConfig = <K extends keyof PdfTextConfig>(key: K, value: PdfTextConfig[K]) => {
+    setConfig(prev => ({
+      ...prev,
+      textContent: { ...prev.textContent, [key]: value }
+    }));
+    setActivePreset(null);
+  };
+
   const generatePreview = useCallback(async () => {
     setIsGeneratingPreview(true);
     try {
@@ -191,7 +200,7 @@ export const PdfFormatEditor = () => {
             {/* Settings Panel */}
             <div className="space-y-4">
               <Tabs defaultValue="fonts" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="fonts" className="flex items-center gap-1">
                     <Type className="h-4 w-4" />
                     Fonts
@@ -203,6 +212,10 @@ export const PdfFormatEditor = () => {
                   <TabsTrigger value="margins" className="flex items-center gap-1">
                     <Box className="h-4 w-4" />
                     Margins
+                  </TabsTrigger>
+                  <TabsTrigger value="text" className="flex items-center gap-1">
+                    <MessageSquare className="h-4 w-4" />
+                    Text
                   </TabsTrigger>
                 </TabsList>
 
@@ -356,6 +369,125 @@ export const PdfFormatEditor = () => {
                       unit="mm"
                       onChange={(v) => updateConfig('boxPadding', v)}
                     />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="text" className="space-y-4 mt-4">
+                  <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                    <h4 className="font-medium text-sm">Header Text</h4>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Title</Label>
+                      <Input
+                        value={config.textContent.headerTitle}
+                        onChange={(e) => updateTextConfig('headerTitle', e.target.value)}
+                        placeholder="ANNEXURE-4"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Subtitle</Label>
+                      <Input
+                        value={config.textContent.headerSubtitle}
+                        onChange={(e) => updateTextConfig('headerSubtitle', e.target.value)}
+                        placeholder="[See para 105]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                    <h4 className="font-medium text-sm">Left Column (Memo)</h4>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Column Title</Label>
+                      <Input
+                        value={config.textContent.leftColumnTitle}
+                        onChange={(e) => updateTextConfig('leftColumnTitle', e.target.value)}
+                        placeholder="Memo of Verification"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Address Section Label</Label>
+                      <Input
+                        value={config.textContent.addressSectionLabel}
+                        onChange={(e) => updateTextConfig('addressSectionLabel', e.target.value)}
+                        placeholder="The name and address of depositor are as below:"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Verification Instruction</Label>
+                      <Textarea
+                        value={config.textContent.verificationInstruction}
+                        onChange={(e) => updateTextConfig('verificationInstruction', e.target.value)}
+                        placeholder="Kindly verify the genuineness..."
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                    <h4 className="font-medium text-sm">Right Column (Reply)</h4>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Column Title</Label>
+                      <Input
+                        value={config.textContent.rightColumnTitle}
+                        onChange={(e) => updateTextConfig('rightColumnTitle', e.target.value)}
+                        placeholder="Reply"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Reply Text</Label>
+                      <Textarea
+                        value={config.textContent.replyText}
+                        onChange={(e) => updateTextConfig('replyText', e.target.value)}
+                        placeholder="The result of verification..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Investigation Text</Label>
+                      <Input
+                        value={config.textContent.investigationText}
+                        onChange={(e) => updateTextConfig('investigationText', e.target.value)}
+                        placeholder="Investigation has been taken up."
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                    <h4 className="font-medium text-sm">Footer & Labels</h4>
+                    <div className="space-y-2">
+                      <Label className="text-sm">Note Text</Label>
+                      <Textarea
+                        value={config.textContent.noteText}
+                        onChange={(e) => updateTextConfig('noteText', e.target.value)}
+                        placeholder="The verification memo should be returned..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="space-y-2">
+                        <Label className="text-sm">To Label</Label>
+                        <Input
+                          value={config.textContent.toLabel}
+                          onChange={(e) => updateTextConfig('toLabel', e.target.value)}
+                          placeholder="To"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">Inspector Label</Label>
+                        <Input
+                          value={config.textContent.inspectorLabel}
+                          onChange={(e) => updateTextConfig('inspectorLabel', e.target.value)}
+                          placeholder="Inspector of Posts,"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm">SPM Label</Label>
+                        <Input
+                          value={config.textContent.subPostmasterLabel}
+                          onChange={(e) => updateTextConfig('subPostmasterLabel', e.target.value)}
+                          placeholder="Sub Post Master"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
