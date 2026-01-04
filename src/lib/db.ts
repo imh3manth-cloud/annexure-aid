@@ -32,6 +32,17 @@ export interface LastBalanceUpload {
   recordCount: number;
 }
 
+export interface LastBalanceRecord {
+  id?: number;
+  account: string;
+  name: string;
+  address: string;
+  balance: number;
+  balance_date: string;
+  bo_name: string;
+  uploaded_at: string;
+}
+
 export interface AppSettings {
   id: string;
   lastSerial: number;
@@ -43,13 +54,15 @@ class MemoDatabase extends Dexie {
   memos!: Table<MemoRecord>;
   settings!: Table<AppSettings>;
   lastBalanceUploads!: Table<LastBalanceUpload>;
+  lastBalanceRecords!: Table<LastBalanceRecord>;
 
   constructor() {
     super('MemoDatabase');
-    this.version(2).stores({
+    this.version(3).stores({
       memos: '++id, serial, memoKey, account, status, BO_Code, printed',
       settings: 'id',
-      lastBalanceUploads: '++id, uploadDate'
+      lastBalanceUploads: '++id, uploadDate',
+      lastBalanceRecords: '++id, account'
     });
   }
 }
@@ -67,4 +80,54 @@ export const initSettings = async () => {
       groupByBO: true
     });
   }
+};
+
+// Save last balance records to database
+export const saveLastBalanceRecords = async (records: Omit<LastBalanceRecord, 'id' | 'uploaded_at'>[]) => {
+  const uploadedAt = new Date().toISOString();
+  const recordsWithTimestamp = records.map(r => ({
+    ...r,
+    uploaded_at: uploadedAt
+  }));
+  
+  // Clear existing and add new records (or upsert by account)
+  await db.transaction('rw', db.lastBalanceRecords, async () => {
+    // Update or insert each record
+    for (const record of recordsWithTimestamp) {
+      const existing = await db.lastBalanceRecords.where('account').equals(record.account).first();
+      if (existing) {
+        await db.lastBalanceRecords.update(existing.id!, record);
+      } else {
+        await db.lastBalanceRecords.add(record);
+      }
+    }
+  });
+  
+  return recordsWithTimestamp.length;
+};
+
+// Get last balance record by account
+export const getLastBalanceByAccount = async (account: string): Promise<LastBalanceRecord | undefined> => {
+  return db.lastBalanceRecords.where('account').equals(account).first();
+};
+
+// Get all last balance records
+export const getAllLastBalanceRecords = async (): Promise<LastBalanceRecord[]> => {
+  return db.lastBalanceRecords.toArray();
+};
+
+// Get last balance date (most recent upload)
+export const getLastBalanceDate = async (): Promise<string | null> => {
+  const records = await db.lastBalanceRecords.orderBy('uploaded_at').reverse().first();
+  return records?.balance_date || null;
+};
+
+// Get count of saved balance records
+export const getLastBalanceCount = async (): Promise<number> => {
+  return db.lastBalanceRecords.count();
+};
+
+// Clear all last balance records
+export const clearLastBalanceRecords = async (): Promise<void> => {
+  await db.lastBalanceRecords.clear();
 };
