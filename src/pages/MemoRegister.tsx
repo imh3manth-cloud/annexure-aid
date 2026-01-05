@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
+import { PdfFormatDialog } from '@/components/PdfFormatDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { MemoPreviewModal } from '@/components/MemoPreviewModal';
@@ -304,6 +305,7 @@ export const MemoRegister = () => {
         </div>
         
         <div className="flex gap-2">
+          <PdfFormatDialog />
           <Button onClick={handleExportExcel} size="sm" variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Export Excel
