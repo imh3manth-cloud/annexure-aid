@@ -58,11 +58,11 @@ class MemoDatabase extends Dexie {
 
   constructor() {
     super('MemoDatabase');
-    this.version(3).stores({
+    this.version(4).stores({
       memos: '++id, serial, memoKey, account, status, BO_Code, printed',
       settings: 'id',
       lastBalanceUploads: '++id, uploadDate',
-      lastBalanceRecords: '++id, account'
+      lastBalanceRecords: '++id, account, uploaded_at'
     });
   }
 }
