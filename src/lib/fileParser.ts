@@ -15,7 +15,7 @@ export interface LastBalanceRecord {
   address: string;
   balance: number;
   balance_date: string;
-  bo_name?: string;
+  bo_name: string;
 }
 
 // Normalize header names
@@ -235,7 +235,7 @@ export const parseLastBalanceCSV = (file: File): Promise<{ records: LastBalanceR
                 address,
                 balance,
                 balance_date: preparedDate,
-                bo_name: boName
+                bo_name: boName || ''
               });
             }
           }

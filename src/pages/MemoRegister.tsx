@@ -76,10 +76,10 @@ export const MemoRegister = () => {
   };
 
   const toggleSelectAll = () => {
-    if (selected.size === paginatedMemos.length) {
+    if (selected.size === filteredMemos.length && filteredMemos.length > 0) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(paginatedMemos.map(m => m.id!)));
+      setSelected(new Set(filteredMemos.map(m => m.id!)));
     }
   };
 
@@ -431,7 +431,7 @@ export const MemoRegister = () => {
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-10 text-center">
                     <Checkbox
-                      checked={selected.size === paginatedMemos.length && paginatedMemos.length > 0}
+                      checked={selected.size === filteredMemos.length && filteredMemos.length > 0}
                       onCheckedChange={toggleSelectAll}
                     />
                   </TableHead>
