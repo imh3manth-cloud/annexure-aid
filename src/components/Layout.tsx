@@ -1,6 +1,6 @@
 import { NavLink } from './NavLink';
 import { ThemeSelector } from './ThemeSelector';
-import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings } from 'lucide-react';
+import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig } from '@/lib/config';
 
@@ -116,6 +116,15 @@ export const Layout = ({ children }: LayoutProps) => {
             >
               <BarChart3 className="w-4 h-4 group-hover:scale-110 transition-transform" />
               <span>Reports</span>
+            </NavLink>
+            
+            <NavLink
+              to="/accounts"
+              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
+              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
+            >
+              <Users className="w-4 h-4 group-hover:scale-110 transition-transform" />
+              <span>Account Details</span>
             </NavLink>
             
             <NavLink
