@@ -16,6 +16,7 @@ export interface LastBalanceRecord {
   balance: number;
   balance_date: string;
   bo_name: string;
+  scheme_type: string;
 }
 
 // Normalize header names
@@ -228,6 +229,9 @@ export const parseLastBalanceCSV = (file: File): Promise<{ records: LastBalanceR
             // BO Name is typically the last column
             const boName = String(row[row.length - 1] || '').trim();
             
+            // Scheme Type is typically at index 2
+            const schemeType = String(row[2] || '').trim();
+            
             if (account && name) {
               records.push({
                 account,
@@ -235,7 +239,8 @@ export const parseLastBalanceCSV = (file: File): Promise<{ records: LastBalanceR
                 address,
                 balance,
                 balance_date: preparedDate,
-                bo_name: boName || ''
+                bo_name: boName || '',
+                scheme_type: schemeType || ''
               });
             }
           }
