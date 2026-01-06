@@ -67,7 +67,8 @@ export const AccountDetails = () => {
           address: r.address,
           balance: r.balance,
           balance_date: r.balance_date,
-          bo_name: r.bo_name
+          bo_name: r.bo_name,
+          scheme_type: r.scheme_type
         })));
 
         await loadSavedBalanceInfo();

@@ -40,6 +40,7 @@ export interface LastBalanceRecord {
   balance: number;
   balance_date: string;
   bo_name: string;
+  scheme_type: string;
   uploaded_at: string;
 }
 
@@ -58,11 +59,11 @@ class MemoDatabase extends Dexie {
 
   constructor() {
     super('MemoDatabase');
-    this.version(4).stores({
+    this.version(5).stores({
       memos: '++id, serial, memoKey, account, status, BO_Code, printed',
       settings: 'id',
       lastBalanceUploads: '++id, uploadDate',
-      lastBalanceRecords: '++id, account, uploaded_at'
+      lastBalanceRecords: '++id, account, uploaded_at, scheme_type'
     });
   }
 }

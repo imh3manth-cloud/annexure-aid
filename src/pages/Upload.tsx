@@ -77,7 +77,8 @@ export const Upload = () => {
           address: rec.address,
           balance: rec.balance,
           balance_date: rec.balance_date,
-          bo_name: rec.bo_name
+          bo_name: rec.bo_name,
+          scheme_type: rec.scheme_type
         });
         if (!latestPreparedDate || rec.balance_date > latestPreparedDate) {
           latestPreparedDate = rec.balance_date;
@@ -186,7 +187,8 @@ export const Upload = () => {
           address: rec.address,
           balance: rec.balance,
           balance_date: rec.balance_date,
-          bo_name: rec.bo_name
+          bo_name: rec.bo_name,
+          scheme_type: rec.scheme_type
         });
         if (!latestPreparedDate || rec.balance_date > latestPreparedDate) {
           latestPreparedDate = rec.balance_date;

@@ -42,7 +42,8 @@ export const BalanceRecordsViewer = () => {
     address: '',
     balance: 0,
     balance_date: '',
-    bo_name: ''
+    bo_name: '',
+    scheme_type: ''
   });
   const { toast } = useToast();
 
@@ -71,7 +72,8 @@ export const BalanceRecordsViewer = () => {
       record.account.toLowerCase().includes(query) ||
       record.name.toLowerCase().includes(query) ||
       record.address.toLowerCase().includes(query) ||
-      record.bo_name.toLowerCase().includes(query)
+      record.bo_name.toLowerCase().includes(query) ||
+      (record.scheme_type || '').toLowerCase().includes(query)
     );
   }, [records, searchQuery]);
 
@@ -96,11 +98,12 @@ export const BalanceRecordsViewer = () => {
       return;
     }
 
-    const headers = ['Account', 'Name', 'Address', 'Balance', 'Balance Date', 'BO Name', 'Uploaded At'];
+    const headers = ['Account', 'Scheme Type', 'Name', 'Address', 'Balance', 'Balance Date', 'BO Name', 'Uploaded At'];
     const csvContent = [
       headers.join(','),
       ...records.map(r => [
         `"${r.account}"`,
+        `"${(r.scheme_type || '').replace(/"/g, '""')}"`,
         `"${r.name.replace(/"/g, '""')}"`,
         `"${r.address.replace(/"/g, '""')}"`,
         r.balance,
@@ -152,7 +155,8 @@ export const BalanceRecordsViewer = () => {
       address: record.address,
       balance: record.balance,
       balance_date: record.balance_date,
-      bo_name: record.bo_name
+      bo_name: record.bo_name,
+      scheme_type: record.scheme_type || ''
     });
   };
 
@@ -262,6 +266,7 @@ export const BalanceRecordsViewer = () => {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[120px]">Account</TableHead>
+                      <TableHead className="hidden sm:table-cell">Scheme</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead className="hidden md:table-cell">Address</TableHead>
                       <TableHead className="text-right">Balance</TableHead>
@@ -274,6 +279,9 @@ export const BalanceRecordsViewer = () => {
                     {paginatedRecords.map((record) => (
                       <TableRow key={record.id}>
                         <TableCell className="font-mono text-xs">{record.account}</TableCell>
+                        <TableCell className="hidden sm:table-cell text-xs">
+                          {record.scheme_type || '-'}
+                        </TableCell>
                         <TableCell className="max-w-[200px] truncate" title={record.name}>
                           {record.name}
                         </TableCell>
@@ -395,13 +403,23 @@ export const BalanceRecordsViewer = () => {
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-bo">BO Name</Label>
-              <Input
-                id="edit-bo"
-                value={editForm.bo_name}
-                onChange={(e) => setEditForm(prev => ({ ...prev, bo_name: e.target.value }))}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-scheme">Scheme Type</Label>
+                <Input
+                  id="edit-scheme"
+                  value={editForm.scheme_type}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, scheme_type: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-bo">BO Name</Label>
+                <Input
+                  id="edit-bo"
+                  value={editForm.bo_name}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, bo_name: e.target.value }))}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>
