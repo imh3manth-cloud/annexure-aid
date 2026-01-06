@@ -11,6 +11,7 @@ import { VerifyReplies } from "./pages/VerifyReplies";
 import { Reminders } from "./pages/Reminders";
 import { ReportsNew } from "./pages/ReportsNew";
 import { Settings } from "./pages/Settings";
+import { AccountDetails } from "./pages/AccountDetails";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { initSettings } from "./lib/db";
@@ -36,6 +37,7 @@ const App = () => {
               <Route path="/verify" element={<VerifyReplies />} />
               <Route path="/reminders" element={<Reminders />} />
               <Route path="/reports" element={<ReportsNew />} />
+              <Route path="/accounts" element={<AccountDetails />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

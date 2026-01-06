@@ -7,8 +7,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/db';
 import { Download, Upload, Trash2, Save } from 'lucide-react';
-import { PdfFormatEditor } from '@/components/PdfFormatEditor';
-import { BalanceRecordsViewer } from '@/components/BalanceRecordsViewer';
 
 interface AppConfig {
   officeName: string;
@@ -225,10 +223,6 @@ export const Settings = () => {
           </Button>
         </CardContent>
       </Card>
-
-      <PdfFormatEditor />
-
-      <BalanceRecordsViewer />
 
       <Card>
         <CardHeader>

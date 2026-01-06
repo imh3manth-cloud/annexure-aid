@@ -5,23 +5,20 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { parseHFTIFile, parseLastBalanceCSV, detectBOCode, HFTITransaction, LastBalanceRecord } from '@/lib/fileParser';
+import { parseHFTIFile, detectBOCode, LastBalanceRecord } from '@/lib/fileParser';
 import { 
   db, 
   MemoRecord, 
   initSettings, 
-  saveLastBalanceRecords, 
   getAllLastBalanceRecords, 
   getLastBalanceCount,
-  getLastBalanceDate,
-  clearLastBalanceRecords 
+  getLastBalanceDate
 } from '@/lib/db';
-import { Upload as UploadIcon, FileSpreadsheet, Database, AlertCircle, Trash2, RefreshCw } from 'lucide-react';
+import { Upload as UploadIcon, FileSpreadsheet, Database, AlertCircle, RefreshCw } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const Upload = () => {
   const [hftiFile, setHftiFile] = useState<File | null>(null);
-  const [balanceFiles, setBalanceFiles] = useState<File[]>([]);
   const [threshold, setThreshold] = useState(10000);
   const [groupByBO, setGroupByBO] = useState(true);
   const [preview, setPreview] = useState<any>(null);
@@ -40,17 +37,6 @@ export const Upload = () => {
     setSavedBalanceInfo({ count, date });
   };
 
-  const handleClearSavedBalance = async () => {
-    if (confirm('Are you sure you want to clear all saved balance data? You will need to upload again.')) {
-      await clearLastBalanceRecords();
-      await loadSavedBalanceInfo();
-      toast({
-        title: 'Cleared',
-        description: 'Saved balance data has been cleared'
-      });
-    }
-  };
-
   const handlePreview = async () => {
     if (!hftiFile) {
       toast({
@@ -61,14 +47,13 @@ export const Upload = () => {
       return;
     }
 
-    // Check if we have saved balance data or new files
+    // Check if we have saved balance data
     const savedRecords = await getAllLastBalanceRecords();
-    const hasNewBalanceFiles = balanceFiles.length > 0;
     
-    if (savedRecords.length === 0 && !hasNewBalanceFiles) {
+    if (savedRecords.length === 0) {
       toast({
         title: 'No balance data',
-        description: 'Please upload Last Balance file(s) - no saved data found',
+        description: 'Please upload Last Balance files in Account Details first',
         variant: 'destructive'
       });
       return;
@@ -98,41 +83,6 @@ export const Upload = () => {
           latestPreparedDate = rec.balance_date;
         }
       });
-      
-      // Parse and add new balance files (if provided)
-      const newBalanceRecords: LastBalanceRecord[] = [];
-      for (const file of balanceFiles) {
-        const { records, preparedDate } = await parseLastBalanceCSV(file);
-        newBalanceRecords.push(...records);
-        
-        records.forEach(rec => {
-          let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
-          accountMap.set(normalizedAccount, rec);
-        });
-        
-        if (!latestPreparedDate || preparedDate > latestPreparedDate) {
-          latestPreparedDate = preparedDate;
-        }
-      }
-      
-      // Save new balance records to database for future use
-      if (newBalanceRecords.length > 0) {
-        const savedCount = await saveLastBalanceRecords(newBalanceRecords.map(r => ({
-          account: r.account,
-          name: r.name,
-          address: r.address,
-          balance: r.balance,
-          balance_date: r.balance_date,
-          bo_name: r.bo_name
-        })));
-        
-        await loadSavedBalanceInfo();
-        
-        toast({
-          title: 'Balance data saved',
-          description: `Saved ${savedCount} balance records for future use`
-        });
-      }
 
       // Filter by threshold and merge data
       const missingAccountsList: string[] = [];
@@ -242,18 +192,6 @@ export const Upload = () => {
           latestPreparedDate = rec.balance_date;
         }
       });
-      
-      // Also include any new files uploaded during this session
-      for (const file of balanceFiles) {
-        const { records, preparedDate } = await parseLastBalanceCSV(file);
-        records.forEach(rec => {
-          let normalizedAccount = rec.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
-          accountMap.set(normalizedAccount, rec);
-        });
-        if (!latestPreparedDate || preparedDate > latestPreparedDate) {
-          latestPreparedDate = preparedDate;
-        }
-      }
 
       // Get existing memos
       const existing = await db.memos.toArray();
@@ -345,7 +283,6 @@ export const Upload = () => {
 
       // Reset
       setHftiFile(null);
-      setBalanceFiles([]);
       setPreview(null);
       setMissingAccounts([]);
     } catch (error: any) {
@@ -362,8 +299,8 @@ export const Upload = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold text-foreground">Upload Files</h2>
-        <p className="text-muted-foreground mt-1">Upload HFTI transactions and Last Balance reports</p>
+        <h2 className="text-3xl font-bold text-foreground">Upload HFTI</h2>
+        <p className="text-muted-foreground mt-1">Upload HFTI transactions for memo generation</p>
       </div>
 
       {/* Saved Balance Data Info */}
@@ -385,28 +322,18 @@ export const Upload = () => {
                   Balance date: {savedBalanceInfo.date || 'Unknown'}
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={loadSavedBalanceInfo}
-                  title="Refresh"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  onClick={handleClearSavedBalance}
-                  title="Clear saved data"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={loadSavedBalanceInfo}
+                title="Refresh"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No saved balance data. Upload Last Balance file(s) below.
+              No saved balance data. Go to <a href="/accounts" className="text-primary underline">Account Details</a> to upload Last Balance files.
             </p>
           )}
         </CardContent>
@@ -414,11 +341,9 @@ export const Upload = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>File Upload</CardTitle>
+          <CardTitle>HFTI Transaction Upload</CardTitle>
           <CardDescription>
-            {savedBalanceInfo.count > 0 
-              ? 'Upload HFTI file. Last Balance is optional - will use saved data.'
-              : 'Upload HFTI file and Last Balance CSV file(s)'}
+            Upload HFTI file to detect high-value withdrawals. Balance data will be matched from saved accounts.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -433,32 +358,6 @@ export const Upload = () => {
               />
               {hftiFile && <FileSpreadsheet className="w-5 h-5 text-green-500" />}
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="balance">
-              Last Balance Files (CSV) 
-              {savedBalanceInfo.count > 0 
-                ? ' - Optional, only for new/updated accounts' 
-                : ' *'}
-            </Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="balance"
-                type="file"
-                accept=".csv"
-                multiple
-                onChange={(e) => setBalanceFiles(Array.from(e.target.files || []))}
-              />
-              {balanceFiles.length > 0 && (
-                <span className="text-sm text-green-500">{balanceFiles.length} files</span>
-              )}
-            </div>
-            {savedBalanceInfo.count > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Uploading new files will add/update the saved balance data
-              </p>
-            )}
           </div>
 
           <div className="space-y-2">
@@ -483,7 +382,7 @@ export const Upload = () => {
           <div className="flex gap-2">
             <Button 
               onClick={handlePreview} 
-              disabled={processing || !hftiFile || (savedBalanceInfo.count === 0 && balanceFiles.length === 0)}
+              disabled={processing || !hftiFile || savedBalanceInfo.count === 0}
             >
               <UploadIcon className="w-4 h-4 mr-2" />
               Preview Detection
