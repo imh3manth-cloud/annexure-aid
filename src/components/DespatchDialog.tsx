@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { db, MemoRecord } from '@/lib/db';
-import { Send, AlertCircle, Bell } from 'lucide-react';
+import { db, MemoRecord, DespatchRecord, saveDespatchRecord, getAllDespatchRecords, getDaysSinceLastDespatch } from '@/lib/db';
+import { Send, Bell, Calendar, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -21,10 +21,13 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
   const [postNumber, setPostNumber] = useState('');
   const [despatchDate, setDespatchDate] = useState(new Date().toISOString().split('T')[0]);
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
+  const [despatchHistory, setDespatchHistory] = useState<DespatchRecord[]>([]);
+  const [daysSinceLastDespatch, setDaysSinceLastDespatch] = useState<number | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
     fetchPendingMemos();
+    fetchDespatchHistory();
   }, []);
 
   useEffect(() => {
@@ -51,6 +54,13 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
       setFromMemo(serials[0].toString());
       setToMemo(serials[serials.length - 1].toString());
     }
+  };
+
+  const fetchDespatchHistory = async () => {
+    const records = await getAllDespatchRecords();
+    setDespatchHistory(records);
+    const days = await getDaysSinceLastDespatch();
+    setDaysSinceLastDespatch(days);
   };
 
   const handleSave = async () => {
@@ -97,6 +107,15 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
         });
       }
 
+      // Save despatch record
+      await saveDespatchRecord({
+        from_memo: fromSerial,
+        to_memo: toSerial,
+        post_number: postNumber,
+        despatch_date: despatchDate,
+        memo_count: memosInRange.length
+      });
+
       toast({ 
         title: 'Despatch details saved', 
         description: `Updated ${memosInRange.length} memos (${fromSerial} to ${toSerial})` 
@@ -109,8 +128,9 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
       setDespatchDate(new Date().toISOString().split('T')[0]);
       setOpen(false);
       
-      // Refresh pending memos
+      // Refresh data
       await fetchPendingMemos();
+      await fetchDespatchHistory();
       
       // Callback
       onDespatchSaved?.();
@@ -119,8 +139,16 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (isOpen) fetchPendingMemos(); }}>
+    <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (isOpen) { fetchPendingMemos(); fetchDespatchHistory(); } }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="relative">
           <Send className="w-4 h-4 mr-2" />
@@ -135,7 +163,7 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="w-5 h-5" />
@@ -146,6 +174,21 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
           </DialogDescription>
         </DialogHeader>
 
+        {/* Days since last despatch */}
+        {daysSinceLastDespatch !== null && (
+          <div className="flex items-center gap-2 p-3 bg-muted/50 border rounded-lg">
+            <Clock className="w-4 h-4 text-muted-foreground" />
+            <span className="text-sm">
+              <span className="font-medium">{daysSinceLastDespatch}</span> day(s) since last despatch
+              {despatchHistory.length > 0 && (
+                <span className="text-muted-foreground ml-1">
+                  (Last: {formatDate(despatchHistory[0].despatch_date)})
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+
         {pendingMemos.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
@@ -155,7 +198,7 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
               </span>
             </div>
             
-            <ScrollArea className="h-40 border rounded-lg">
+            <ScrollArea className="h-32 border rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -224,6 +267,38 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
             />
           </div>
         </div>
+
+        {/* Despatch History */}
+        {despatchHistory.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Recent Despatch History
+            </h4>
+            <ScrollArea className="h-32 border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>From-To</TableHead>
+                    <TableHead>Post No.</TableHead>
+                    <TableHead>Despatch Date</TableHead>
+                    <TableHead className="text-right">Memos</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {despatchHistory.slice(0, 10).map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell className="font-medium">{record.from_memo} - {record.to_memo}</TableCell>
+                      <TableCell>{record.post_number}</TableCell>
+                      <TableCell>{formatDate(record.despatch_date)}</TableCell>
+                      <TableCell className="text-right">{record.memo_count}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => setOpen(false)}>

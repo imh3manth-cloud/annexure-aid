@@ -44,6 +44,16 @@ export interface LastBalanceRecord {
   uploaded_at: string;
 }
 
+export interface DespatchRecord {
+  id?: number;
+  from_memo: number;
+  to_memo: number;
+  post_number: string;
+  despatch_date: string;
+  memo_count: number;
+  created_at: string;
+}
+
 export interface AppSettings {
   id: string;
   lastSerial: number;
@@ -56,14 +66,16 @@ class MemoDatabase extends Dexie {
   settings!: Table<AppSettings>;
   lastBalanceUploads!: Table<LastBalanceUpload>;
   lastBalanceRecords!: Table<LastBalanceRecord>;
+  despatchRecords!: Table<DespatchRecord>;
 
   constructor() {
     super('MemoDatabase');
-    this.version(5).stores({
+    this.version(6).stores({
       memos: '++id, serial, memoKey, account, status, BO_Code, printed',
       settings: 'id',
       lastBalanceUploads: '++id, uploadDate',
-      lastBalanceRecords: '++id, account, uploaded_at, scheme_type'
+      lastBalanceRecords: '++id, account, uploaded_at, scheme_type',
+      despatchRecords: '++id, despatch_date, created_at'
     });
   }
 }
@@ -144,4 +156,32 @@ export const updateLastBalanceRecord = async (
 // Delete a single last balance record
 export const deleteLastBalanceRecord = async (id: number): Promise<void> => {
   await db.lastBalanceRecords.delete(id);
+};
+
+// Save despatch record
+export const saveDespatchRecord = async (record: Omit<DespatchRecord, 'id' | 'created_at'>): Promise<number> => {
+  return db.despatchRecords.add({
+    ...record,
+    created_at: new Date().toISOString()
+  });
+};
+
+// Get all despatch records
+export const getAllDespatchRecords = async (): Promise<DespatchRecord[]> => {
+  return db.despatchRecords.orderBy('despatch_date').reverse().toArray();
+};
+
+// Get last despatch record
+export const getLastDespatchRecord = async (): Promise<DespatchRecord | undefined> => {
+  return db.despatchRecords.orderBy('despatch_date').reverse().first();
+};
+
+// Get days since last despatch
+export const getDaysSinceLastDespatch = async (): Promise<number | null> => {
+  const lastRecord = await getLastDespatchRecord();
+  if (!lastRecord) return null;
+  const lastDate = new Date(lastRecord.despatch_date);
+  const today = new Date();
+  const diffTime = today.getTime() - lastDate.getTime();
+  return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 };
