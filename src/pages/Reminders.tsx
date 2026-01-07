@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateReminderPDF, generateOverdueReportPDF } from '@/lib/pdfGenerator';
 import { Bell, AlertTriangle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DespatchDialog } from '@/components/DespatchDialog';
 
 export const Reminders = () => {
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
@@ -158,9 +159,12 @@ export const Reminders = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">Reminders & Reports</h2>
-        <p className="text-muted-foreground mt-1">Generate reminders to IP and overdue reports to SP</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h2 className="text-3xl font-bold text-foreground">Reminders & Reports</h2>
+          <p className="text-muted-foreground mt-1">Generate reminders to IP and overdue reports to SP</p>
+        </div>
+        <DespatchDialog onDespatchSaved={loadMemos} />
       </div>
 
       <Tabs defaultValue="reminders" className="w-full">
