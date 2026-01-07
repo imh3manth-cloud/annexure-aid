@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { db, MemoRecord } from '@/lib/db';
-import { Send, AlertCircle } from 'lucide-react';
+import { Send, AlertCircle, Bell } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface DespatchDialogProps {
   onDespatchSaved?: () => void;
@@ -18,19 +20,37 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
   const [toMemo, setToMemo] = useState('');
   const [postNumber, setPostNumber] = useState('');
   const [despatchDate, setDespatchDate] = useState(new Date().toISOString().split('T')[0]);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
-    checkPendingDespatch();
+    fetchPendingMemos();
   }, []);
 
-  const checkPendingDespatch = async () => {
-    // Count printed memos without despatch details (printed=true, memo_sent_date is set but no post_number)
+  useEffect(() => {
+    // Show notification toast if there are pending memos
+    if (pendingMemos.length > 0 && !open) {
+      toast({
+        title: `${pendingMemos.length} printed memo(s) awaiting despatch`,
+        description: 'Click "Despatch Details" to enter post number and date',
+        duration: 5000,
+      });
+    }
+  }, [pendingMemos.length]);
+
+  const fetchPendingMemos = async () => {
+    // Get printed memos without despatch details (printed=true, no post_number in remarks)
     const printedMemos = await db.memos
-      .filter(m => m.printed && m.memo_sent_date && !m.remarks?.includes('Post No:'))
+      .filter(m => m.printed === true && !m.remarks?.includes('Post No:'))
       .toArray();
-    setPendingCount(printedMemos.length);
+    setPendingMemos(printedMemos);
+    
+    // Auto-fill from/to if there are pending memos
+    if (printedMemos.length > 0) {
+      const serials = printedMemos.map(m => m.serial).sort((a, b) => a - b);
+      setFromMemo(serials[0].toString());
+      setToMemo(serials[serials.length - 1].toString());
+    }
   };
 
   const handleSave = async () => {
@@ -89,8 +109,8 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
       setDespatchDate(new Date().toISOString().split('T')[0]);
       setOpen(false);
       
-      // Refresh pending count
-      await checkPendingDespatch();
+      // Refresh pending memos
+      await fetchPendingMemos();
       
       // Callback
       onDespatchSaved?.();
@@ -100,22 +120,22 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => { setOpen(isOpen); if (isOpen) fetchPendingMemos(); }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="relative">
           <Send className="w-4 h-4 mr-2" />
           Despatch Details
-          {pendingCount > 0 && (
+          {pendingMemos.length > 0 && (
             <Badge 
               variant="destructive" 
-              className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
+              className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs animate-pulse"
             >
-              {pendingCount > 99 ? '99+' : pendingCount}
+              {pendingMemos.length > 99 ? '99+' : pendingMemos.length}
             </Badge>
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="w-5 h-5" />
@@ -126,12 +146,37 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
           </DialogDescription>
         </DialogHeader>
 
-        {pendingCount > 0 && (
-          <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
-            <AlertCircle className="w-4 h-4 text-warning" />
-            <span className="text-sm text-warning">
-              {pendingCount} printed memo(s) awaiting despatch details
-            </span>
+        {pendingMemos.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+              <Bell className="w-4 h-4 text-warning animate-bounce" />
+              <span className="text-sm font-medium text-warning">
+                {pendingMemos.length} printed memo(s) awaiting despatch details
+              </span>
+            </div>
+            
+            <ScrollArea className="h-40 border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-20">Serial</TableHead>
+                    <TableHead>Account</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Printed Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pendingMemos.map((memo) => (
+                    <TableRow key={memo.id}>
+                      <TableCell className="font-medium">{memo.serial}</TableCell>
+                      <TableCell>{memo.account}</TableCell>
+                      <TableCell>{memo.name}</TableCell>
+                      <TableCell>{memo.memo_sent_date || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
           </div>
         )}
 
@@ -184,7 +229,7 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>
+          <Button onClick={handleSave} disabled={pendingMemos.length === 0 && !fromMemo}>
             <Send className="w-4 h-4 mr-2" />
             Save Details
           </Button>
