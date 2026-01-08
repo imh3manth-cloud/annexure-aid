@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileText, Calendar } from 'lucide-react';
+import { Download, FileText, Calendar, ArrowLeft } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
@@ -63,6 +64,7 @@ const getQuarterOptions = () => {
 };
 
 export const Reports = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -257,9 +259,14 @@ export const Reports = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">Reports</h2>
-        <p className="text-muted-foreground mt-1">Export and analyze verification data</p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/operations')}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h2 className="text-3xl font-bold text-foreground">Reports</h2>
+          <p className="text-muted-foreground mt-1">Export and analyze verification data</p>
+        </div>
       </div>
 
       {/* Quarterly Report Card - Highlighted */}

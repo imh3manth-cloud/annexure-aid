@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,9 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, XCircle, Search } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, ArrowLeft } from 'lucide-react';
 
 export const VerifyReplies = () => {
+  const navigate = useNavigate();
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
   const [filteredMemos, setFilteredMemos] = useState<MemoRecord[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -117,9 +119,14 @@ export const VerifyReplies = () => {
   if (!currentMemo) {
     return (
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <h2 className="text-3xl font-bold text-foreground">Verify Replies</h2>
-          <p className="text-muted-foreground mt-1">Process verification responses</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/operations')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold text-foreground">Verify Replies</h2>
+            <p className="text-muted-foreground mt-1">Process verification responses</p>
+          </div>
         </div>
 
         {/* Search Section */}
@@ -168,12 +175,17 @@ export const VerifyReplies = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-3xl font-bold text-foreground">Verify Replies</h2>
-          <p className="text-muted-foreground mt-1">
-            Processing memo {currentIndex + 1} of {filteredMemos.length}
-            {searchQuery && ` (filtered from ${pendingMemos.length})`}
-          </p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/operations')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold text-foreground">Verify Replies</h2>
+            <p className="text-muted-foreground mt-1">
+              Processing memo {currentIndex + 1} of {filteredMemos.length}
+              {searchQuery && ` (filtered from ${pendingMemos.length})`}
+            </p>
+          </div>
         </div>
       </div>
 
