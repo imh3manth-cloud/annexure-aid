@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import {
   getLastBalanceCount,
   getLastBalanceDate
 } from '@/lib/db';
-import { Upload as UploadIcon, FileSpreadsheet, Database, AlertCircle, RefreshCw } from 'lucide-react';
+import { Upload as UploadIcon, FileSpreadsheet, Database, AlertCircle, RefreshCw, ArrowLeft } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const Upload = () => {
@@ -298,11 +299,18 @@ export const Upload = () => {
     }
   };
 
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">Upload HFTI</h2>
-        <p className="text-muted-foreground mt-1">Upload HFTI transactions for memo generation</p>
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/operations')}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h2 className="text-3xl font-bold text-foreground">Upload HFTI</h2>
+          <p className="text-muted-foreground mt-1">Upload HFTI transactions for memo generation</p>
+        </div>
       </div>
 
       {/* Saved Balance Data Info */}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2, ArrowLeft } from 'lucide-react';
 import { PdfFormatDialog } from '@/components/PdfFormatDialog';
 import { DespatchDialog } from '@/components/DespatchDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,6 +21,7 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
 export const MemoRegister = () => {
+  const navigate = useNavigate();
   const [memos, setMemos] = useState<MemoRecord[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<'all' | 'New' | 'Pending' | 'Verified' | 'Reported'>('all');
@@ -300,9 +302,14 @@ export const MemoRegister = () => {
       />
       
       <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-3xl font-bold text-foreground">Register of Verification Memos</h2>
-          <p className="text-muted-foreground mt-1">As per POSB CBS Manual format</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/operations')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold text-foreground">Register of Verification Memos</h2>
+            <p className="text-muted-foreground mt-1">As per POSB CBS Manual format</p>
+          </div>
         </div>
         
         <div className="flex gap-2">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,11 +9,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateReminderPDF, generateOverdueReportPDF } from '@/lib/pdfGenerator';
-import { Bell, AlertTriangle } from 'lucide-react';
+import { Bell, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DespatchDialog } from '@/components/DespatchDialog';
 
 export const Reminders = () => {
+  const navigate = useNavigate();
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
   const [overdueMemos, setOverdueMemos] = useState<MemoRecord[]>([]);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -160,9 +162,14 @@ export const Reminders = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-start">
-        <div>
-          <h2 className="text-3xl font-bold text-foreground">Reminders & Reports</h2>
-          <p className="text-muted-foreground mt-1">Generate reminders to IP and overdue reports to SP</p>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/operations')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h2 className="text-3xl font-bold text-foreground">Reminders & Reports</h2>
+            <p className="text-muted-foreground mt-1">Generate reminders to IP and overdue reports to SP</p>
+          </div>
         </div>
         <DespatchDialog onDespatchSaved={loadMemos} />
       </div>
