@@ -1,15 +1,34 @@
 import { NavLink } from './NavLink';
 import { ThemeSelector } from './ThemeSelector';
-import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users } from 'lucide-react';
+import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig } from '@/lib/config';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
+const menuItems = [
+  { to: '/upload', icon: FileUp, label: 'Upload', color: 'bg-blue-500', hoverColor: 'hover:bg-blue-600' },
+  { to: '/register', icon: List, label: 'Memo Register', color: 'bg-emerald-500', hoverColor: 'hover:bg-emerald-600' },
+  { to: '/verify', icon: CheckCircle, label: 'Verify Replies', color: 'bg-violet-500', hoverColor: 'hover:bg-violet-600' },
+  { to: '/reminders', icon: Bell, label: 'Reminders', color: 'bg-amber-500', hoverColor: 'hover:bg-amber-600' },
+  { to: '/reports', icon: BarChart3, label: 'Reports', color: 'bg-rose-500', hoverColor: 'hover:bg-rose-600' },
+];
+
 export const Layout = ({ children }: LayoutProps) => {
   const [subdivision, setSubdivision] = useState('T NARASIPURA SUB DIVISION');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isMenuItemActive = menuItems.some(item => location.pathname === item.to);
 
   useEffect(() => {
     const loadConfig = () => {
@@ -37,6 +56,12 @@ export const Layout = ({ children }: LayoutProps) => {
       window.removeEventListener('configUpdated', handleConfigChange);
     };
   }, []);
+
+  const handleMenuItemClick = (to: string) => {
+    navigate(to);
+    setMenuOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -73,50 +98,36 @@ export const Layout = ({ children }: LayoutProps) => {
               <span>Dashboard</span>
             </NavLink>
             
-            <NavLink
-              to="/upload"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
-              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
-            >
-              <FileUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span>Upload</span>
-            </NavLink>
-            
-            <NavLink
-              to="/register"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
-              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
-            >
-              <List className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span>Memo Register</span>
-            </NavLink>
-            
-            <NavLink
-              to="/verify"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
-              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
-            >
-              <CheckCircle className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span>Verify Replies</span>
-            </NavLink>
-            
-            <NavLink
-              to="/reminders"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
-              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
-            >
-              <Bell className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span>Reminders</span>
-            </NavLink>
-            
-            <NavLink
-              to="/reports"
-              className="flex items-center space-x-2 px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5 transition-all duration-300 relative group"
-              activeClassName="text-foreground bg-background border-b-2 border-primary shadow-sm"
-            >
-              <BarChart3 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-              <span>Reports</span>
-            </NavLink>
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={`flex items-center space-x-2 px-4 py-3 text-sm font-medium transition-all duration-300 relative group ${
+                    isMenuItemActive 
+                      ? 'text-foreground bg-background border-b-2 border-primary shadow-sm' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-gradient-to-r hover:from-primary/5 hover:to-accent/5'
+                  }`}
+                >
+                  <Grid3X3 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                  <span>Operations</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="p-3 w-[320px]" align="start">
+                <div className="grid grid-cols-2 gap-2">
+                  {menuItems.map((item) => (
+                    <button
+                      key={item.to}
+                      onClick={() => handleMenuItemClick(item.to)}
+                      className={`flex flex-col items-center justify-center p-4 rounded-lg text-white transition-all duration-200 transform hover:scale-105 ${item.color} ${item.hoverColor} ${
+                        location.pathname === item.to ? 'ring-2 ring-offset-2 ring-offset-background ring-white' : ''
+                      }`}
+                    >
+                      <item.icon className="w-6 h-6 mb-2" />
+                      <span className="text-xs font-medium text-center">{item.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             <NavLink
               to="/accounts"
