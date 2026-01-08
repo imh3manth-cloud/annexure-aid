@@ -12,6 +12,7 @@ import { Reminders } from "./pages/Reminders";
 import { ReportsNew } from "./pages/ReportsNew";
 import { Settings } from "./pages/Settings";
 import { AccountDetails } from "./pages/AccountDetails";
+import { Operations } from "./pages/Operations";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { initSettings } from "./lib/db";
@@ -32,6 +33,7 @@ const App = () => {
           <Layout>
             <Routes>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/operations" element={<Operations />} />
               <Route path="/upload" element={<Upload />} />
               <Route path="/register" element={<MemoRegister />} />
               <Route path="/verify" element={<VerifyReplies />} />
