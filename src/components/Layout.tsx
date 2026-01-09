@@ -1,6 +1,6 @@
 import { NavLink } from './NavLink';
 import { ThemeSelector } from './ThemeSelector';
-import { FileUp, LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig } from '@/lib/config';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -10,7 +10,6 @@ interface LayoutProps {
 }
 
 export const menuItems = [
-  { to: '/upload', icon: FileUp, label: 'Upload', description: 'Upload withdrawal data', color: 'from-blue-500 to-blue-600' },
   { to: '/hfti-register', icon: List, label: 'HFTI Transaction Register', description: 'Saved BO transactions (working register)', color: 'from-cyan-500 to-cyan-600' },
   { to: '/register', icon: List, label: 'Memo Register', description: 'View & manage memos', color: 'from-emerald-500 to-emerald-600' },
   { to: '/verify', icon: CheckCircle, label: 'Verify Replies', description: 'Verify BO responses', color: 'from-violet-500 to-violet-600' },

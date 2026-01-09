@@ -1,20 +1,43 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Filter, X, Database, Download } from 'lucide-react';
-import { getAllHFTITransactions, getFilteredHFTITransactions, HFTITransactionRecord } from '@/lib/db';
+import { ArrowLeft, Filter, X, Database, Upload, FileSpreadsheet, CheckCircle, Calendar } from 'lucide-react';
+import { 
+  getAllHFTITransactions, 
+  getFilteredHFTITransactions, 
+  HFTITransactionRecord, 
+  saveHFTITransactions,
+  getHFTITransactionCount,
+  getHFTIDateRange
+} from '@/lib/db';
+import { parseHFTIFile, detectBOCode } from '@/lib/fileParser';
+import { useToast } from '@/hooks/use-toast';
 
 export const HFTIRegister = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [transactions, setTransactions] = useState<HFTITransactionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
+  
+  // Upload states
+  const [hftiFile, setHftiFile] = useState<File | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [lastUploadResult, setLastUploadResult] = useState<{ saved: number; skipped: number } | null>(null);
+  
+  // Date range tracking
+  const [dateRange, setDateRange] = useState<{ fromDate: string | null; toDate: string | null }>({
+    fromDate: null,
+    toDate: null
+  });
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -38,6 +61,10 @@ export const HFTIRegister = () => {
         account: filters.account || undefined
       });
       setTransactions(data);
+      
+      // Load date range
+      const range = await getHFTIDateRange();
+      setDateRange(range);
     } catch (error) {
       console.error('Failed to load transactions:', error);
     } finally {
@@ -77,6 +104,76 @@ export const HFTIRegister = () => {
     return { debitCount, creditCount, totalDebit, totalCredit };
   }, [transactions]);
 
+  const handleUpload = async () => {
+    if (!hftiFile) {
+      toast({
+        title: 'Missing HFTI file',
+        description: 'Please select an HFTI transaction file',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setProcessing(true);
+    try {
+      // Parse HFTI file
+      const parsedTransactions = await parseHFTIFile(hftiFile);
+      
+      // Transform to HFTI register format
+      const hftiRecords = parsedTransactions.map(t => {
+        const bo = detectBOCode(t.particulars);
+        return {
+          txn_date: t.txn_date,
+          txn_id: t.txn_id,
+          account: t.account,
+          amount: t.amount,
+          debit_credit: t.debit_credit,
+          bo_reference: bo.code !== 'Unknown' ? `${bo.code} - ${bo.name}` : '',
+          particulars: t.particulars,
+          source_file: hftiFile.name
+        };
+      });
+
+      // Save to HFTI register (append mode, no duplicates)
+      const result = await saveHFTITransactions(hftiRecords, hftiFile.name);
+      
+      setLastUploadResult(result);
+      await loadTransactions();
+
+      toast({
+        title: 'Upload Successful',
+        description: `${result.saved} transactions saved successfully${result.skipped > 0 ? ` (${result.skipped} duplicates skipped)` : ''}`
+      });
+
+      // Reset file input
+      setHftiFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Upload failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return '-';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-IN', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
@@ -94,8 +191,8 @@ export const HFTIRegister = () => {
         </Button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats Cards with Date Range */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-4">
             <div className="text-2xl font-bold">{transactions.length.toLocaleString()}</div>
@@ -116,12 +213,102 @@ export const HFTIRegister = () => {
             <p className="text-xs text-muted-foreground">₹{stats.totalCredit.toLocaleString()}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4 flex items-center justify-center">
-            <Database className="h-8 w-8 text-muted-foreground" />
+        <Card className="col-span-2 border-primary/20 bg-primary/5">
+          <CardContent className="pt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium text-primary">Data Range</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <div>
+                <p className="text-muted-foreground">From</p>
+                <p className="font-medium">{formatDate(dateRange.fromDate)}</p>
+              </div>
+              <div className="text-muted-foreground">→</div>
+              <div className="text-right">
+                <p className="text-muted-foreground">To</p>
+                <p className="font-medium">{formatDate(dateRange.toDate)}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Upload Section - Always visible as a button, expandable */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Upload className="h-5 w-5 text-primary" />
+              Upload HFTI Transactions
+            </CardTitle>
+            <Button 
+              variant={showUpload ? "secondary" : "default"}
+              size="sm"
+              onClick={() => setShowUpload(!showUpload)}
+            >
+              {showUpload ? 'Hide Upload' : 'Upload New Data'}
+            </Button>
+          </div>
+          {!showUpload && (
+            <CardDescription>
+              Click "Upload New Data" to add more transactions from HFTI Excel files
+            </CardDescription>
+          )}
+        </CardHeader>
+        
+        {showUpload && (
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="hfti">HFTI Transaction File (Excel) *</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="hfti"
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => {
+                    setHftiFile(e.target.files?.[0] || null);
+                    setLastUploadResult(null);
+                  }}
+                />
+                {hftiFile && <FileSpreadsheet className="w-5 h-5 text-green-500" />}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Both debit and credit transactions will be saved with their D/C flag. Duplicates are automatically skipped.
+              </p>
+            </div>
+
+            <Button 
+              onClick={handleUpload} 
+              disabled={processing || !hftiFile}
+              className="w-full"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {processing ? 'Processing...' : 'Upload & Save Transactions'}
+            </Button>
+
+            {/* Last Upload Result */}
+            {lastUploadResult && (
+              <div className="flex items-center gap-4 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                <div className="p-2 bg-green-500/20 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-green-700 dark:text-green-400">
+                    {lastUploadResult.saved} transactions saved successfully
+                  </h3>
+                  {lastUploadResult.skipped > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      {lastUploadResult.skipped} duplicate transactions were skipped
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       {/* Filters Panel */}
       {showFilters && (
@@ -213,7 +400,14 @@ export const HFTIRegister = () => {
             <div className="p-8 text-center text-muted-foreground">
               <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No transactions found</p>
-              <p className="text-sm mt-2">Upload HFTI files to populate this register</p>
+              <p className="text-sm mt-2">Upload HFTI files using the button above</p>
+              <Button 
+                className="mt-4" 
+                onClick={() => setShowUpload(true)}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Upload HFTI File
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
