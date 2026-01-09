@@ -7,6 +7,7 @@ export interface HFTITransaction {
   txn_id: string;
   amount: number;
   particulars: string;
+  debit_credit: 'D' | 'C';
 }
 
 export interface LastBalanceRecord {
@@ -28,7 +29,7 @@ const normalizeHeader = (header: string): string => {
     .trim();
 };
 
-// Parse HFTI Excel file
+// Parse HFTI Excel file - returns ALL transactions with debit/credit flag
 export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -57,19 +58,19 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
           // Find transaction ID
           const txnId = row['Transaction ID'] || row['txn_id'] || row['tran_id'] || row['reference'] || '';
           
-          // Find amount - only process if it ends with 'D' (debit)
+          // Find amount - check if it ends with 'D' (debit) or 'C' (credit)
           let amountStr = row['Amt.'] || row['amount'] || row['withdrawal_amt'] || row['debit_amount'] || '0';
-          let isDebit = false;
+          let debitCredit: 'D' | 'C' = 'D';
           if (typeof amountStr === 'string') {
-            isDebit = amountStr.trim().toUpperCase().endsWith('D');
+            const trimmed = amountStr.trim().toUpperCase();
+            if (trimmed.endsWith('D')) {
+              debitCredit = 'D';
+            } else if (trimmed.endsWith('C')) {
+              debitCredit = 'C';
+            }
             amountStr = amountStr.replace(/[^\d.]/g, '');
           }
           const amount = parseFloat(amountStr) || 0;
-          
-          // Skip if not a debit transaction
-          if (!isDebit) {
-            return null;
-          }
           
           // Find particulars
           const particulars = row['Particulars'] || row['particulars'] || row['narration'] || '';
@@ -100,7 +101,8 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
             account,
             txn_id: String(txnId),
             amount,
-            particulars: String(particulars)
+            particulars: String(particulars),
+            debit_credit: debitCredit
           };
         });
         

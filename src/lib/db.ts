@@ -61,21 +61,37 @@ export interface AppSettings {
   groupByBO: boolean;
 }
 
+// NEW: HFTI Transaction interface for master register
+export interface HFTITransactionRecord {
+  id?: number;
+  txn_date: string;
+  txn_id: string;
+  account: string;
+  amount: number;
+  debit_credit: 'D' | 'C';
+  bo_reference: string;
+  particulars: string;
+  uploaded_at: string;
+  source_file: string;
+}
+
 class MemoDatabase extends Dexie {
   memos!: Table<MemoRecord>;
   settings!: Table<AppSettings>;
   lastBalanceUploads!: Table<LastBalanceUpload>;
   lastBalanceRecords!: Table<LastBalanceRecord>;
   despatchRecords!: Table<DespatchRecord>;
+  hftiTransactions!: Table<HFTITransactionRecord>;
 
   constructor() {
     super('MemoDatabase');
-    this.version(6).stores({
+    this.version(7).stores({
       memos: '++id, serial, memoKey, account, status, BO_Code, printed',
       settings: 'id',
       lastBalanceUploads: '++id, uploadDate',
       lastBalanceRecords: '++id, account, uploaded_at, scheme_type',
-      despatchRecords: '++id, despatch_date, created_at'
+      despatchRecords: '++id, despatch_date, created_at',
+      hftiTransactions: '++id, txn_date, txn_id, account, debit_credit, uploaded_at'
     });
   }
 }
@@ -184,4 +200,102 @@ export const getDaysSinceLastDespatch = async (): Promise<number | null> => {
   const today = new Date();
   const diffTime = today.getTime() - lastDate.getTime();
   return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+};
+
+// ============ HFTI Transaction Register Functions ============
+
+// Save HFTI transactions (append mode - no duplicates based on txn_id + account + amount + date)
+export const saveHFTITransactions = async (
+  transactions: Omit<HFTITransactionRecord, 'id' | 'uploaded_at'>[],
+  sourceFile: string
+): Promise<{ saved: number; skipped: number }> => {
+  const uploadedAt = new Date().toISOString();
+  
+  // Get existing transaction keys to check duplicates
+  const existing = await db.hftiTransactions.toArray();
+  const existingKeys = new Set(existing.map(t => `${t.txn_id}|${t.account}|${t.amount}|${t.txn_date}`));
+  
+  const newTransactions: HFTITransactionRecord[] = [];
+  let skipped = 0;
+  
+  for (const txn of transactions) {
+    const key = `${txn.txn_id}|${txn.account}|${txn.amount}|${txn.txn_date}`;
+    if (existingKeys.has(key)) {
+      skipped++;
+    } else {
+      existingKeys.add(key); // Prevent duplicates within same batch
+      newTransactions.push({
+        ...txn,
+        uploaded_at: uploadedAt,
+        source_file: sourceFile
+      });
+    }
+  }
+  
+  if (newTransactions.length > 0) {
+    await db.hftiTransactions.bulkAdd(newTransactions);
+  }
+  
+  return { saved: newTransactions.length, skipped };
+};
+
+// Get all HFTI transactions
+export const getAllHFTITransactions = async (): Promise<HFTITransactionRecord[]> => {
+  return db.hftiTransactions.orderBy('txn_date').reverse().toArray();
+};
+
+// Get HFTI transactions count
+export const getHFTITransactionCount = async (): Promise<number> => {
+  return db.hftiTransactions.count();
+};
+
+// Get HFTI transactions with filters
+export const getFilteredHFTITransactions = async (filters: {
+  startDate?: string;
+  endDate?: string;
+  debitCredit?: 'D' | 'C' | 'all';
+  minAmount?: number;
+  maxAmount?: number;
+  account?: string;
+}): Promise<HFTITransactionRecord[]> => {
+  let collection = db.hftiTransactions.toCollection();
+  
+  let transactions = await collection.toArray();
+  
+  // Apply filters
+  if (filters.startDate) {
+    transactions = transactions.filter(t => t.txn_date >= filters.startDate!);
+  }
+  if (filters.endDate) {
+    transactions = transactions.filter(t => t.txn_date <= filters.endDate!);
+  }
+  if (filters.debitCredit && filters.debitCredit !== 'all') {
+    transactions = transactions.filter(t => t.debit_credit === filters.debitCredit);
+  }
+  if (filters.minAmount !== undefined) {
+    transactions = transactions.filter(t => t.amount >= filters.minAmount!);
+  }
+  if (filters.maxAmount !== undefined) {
+    transactions = transactions.filter(t => t.amount <= filters.maxAmount!);
+  }
+  if (filters.account) {
+    const searchAccount = filters.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+    transactions = transactions.filter(t => {
+      const txnAccount = t.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+      return txnAccount.includes(searchAccount);
+    });
+  }
+  
+  return transactions.sort((a, b) => new Date(b.txn_date).getTime() - new Date(a.txn_date).getTime());
+};
+
+// Get debit-only BO transactions for SB-45 register
+export const getDebitBOTransactions = async (): Promise<HFTITransactionRecord[]> => {
+  const transactions = await db.hftiTransactions.where('debit_credit').equals('D').toArray();
+  return transactions.filter(t => t.bo_reference && t.bo_reference !== 'Unknown');
+};
+
+// Clear all HFTI transactions
+export const clearHFTITransactions = async (): Promise<void> => {
+  await db.hftiTransactions.clear();
 };

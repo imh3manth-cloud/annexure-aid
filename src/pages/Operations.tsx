@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { menuItems } from '@/components/Layout';
 import { useEffect, useState } from 'react';
-import { db } from '@/lib/db';
+import { db, getHFTITransactionCount } from '@/lib/db';
 import { Badge } from '@/components/ui/badge';
 
 interface PendingCounts {
   upload: number;
+  hftiRegister: number;
   register: number;
   verify: number;
   reminders: number;
@@ -16,6 +17,7 @@ export const Operations = () => {
   const navigate = useNavigate();
   const [counts, setCounts] = useState<PendingCounts>({
     upload: 0,
+    hftiRegister: 0,
     register: 0,
     verify: 0,
     reminders: 0,
@@ -25,6 +27,7 @@ export const Operations = () => {
   useEffect(() => {
     const loadCounts = async () => {
       const allMemos = await db.memos.toArray();
+      const hftiCount = await getHFTITransactionCount();
       
       // New memos not yet printed
       const newMemos = allMemos.filter(m => m.status === 'New' && !m.printed);
@@ -44,6 +47,7 @@ export const Operations = () => {
 
       setCounts({
         upload: 0, // Upload doesn't have pending items
+        hftiRegister: hftiCount,
         register: newMemos.length,
         verify: pendingVerify.length,
         reminders: remindersNeeded.length,
@@ -57,6 +61,7 @@ export const Operations = () => {
   const getCountForRoute = (route: string): number => {
     switch (route) {
       case '/upload': return counts.upload;
+      case '/hfti-register': return counts.hftiRegister;
       case '/register': return counts.register;
       case '/verify': return counts.verify;
       case '/reminders': return counts.reminders;
@@ -91,7 +96,7 @@ export const Operations = () => {
                 <Badge 
                   className="absolute top-3 right-3 bg-white text-gray-800 font-bold px-2.5 py-1 text-sm shadow-lg"
                 >
-                  {count}
+                  {count.toLocaleString()}
                 </Badge>
               )}
               
