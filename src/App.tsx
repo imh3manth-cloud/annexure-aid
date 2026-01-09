@@ -13,6 +13,7 @@ import { ReportsNew } from "./pages/ReportsNew";
 import { Settings } from "./pages/Settings";
 import { AccountDetails } from "./pages/AccountDetails";
 import { Operations } from "./pages/Operations";
+import { HFTIRegister } from "./pages/HFTIRegister";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { initSettings } from "./lib/db";
@@ -35,6 +36,7 @@ const App = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/operations" element={<Operations />} />
               <Route path="/upload" element={<Upload />} />
+              <Route path="/hfti-register" element={<HFTIRegister />} />
               <Route path="/register" element={<MemoRegister />} />
               <Route path="/verify" element={<VerifyReplies />} />
               <Route path="/reminders" element={<Reminders />} />

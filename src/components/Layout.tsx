@@ -11,6 +11,7 @@ interface LayoutProps {
 
 export const menuItems = [
   { to: '/upload', icon: FileUp, label: 'Upload', description: 'Upload withdrawal data', color: 'from-blue-500 to-blue-600' },
+  { to: '/hfti-register', icon: List, label: 'HFTI Transaction Register', description: 'Saved BO transactions (working register)', color: 'from-cyan-500 to-cyan-600' },
   { to: '/register', icon: List, label: 'Memo Register', description: 'View & manage memos', color: 'from-emerald-500 to-emerald-600' },
   { to: '/verify', icon: CheckCircle, label: 'Verify Replies', description: 'Verify BO responses', color: 'from-violet-500 to-violet-600' },
   { to: '/reminders', icon: Bell, label: 'Reminders', description: 'Pending reminders', color: 'from-amber-500 to-amber-600' },
