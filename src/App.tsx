@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./pages/Dashboard";
-import { Upload } from "./pages/Upload";
+
 import { MemoRegister } from "./pages/MemoRegister";
 import { VerifyReplies } from "./pages/VerifyReplies";
 import { Reminders } from "./pages/Reminders";
@@ -35,7 +35,7 @@ const App = () => {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/operations" element={<Operations />} />
-              <Route path="/upload" element={<Upload />} />
+              
               <Route path="/hfti-register" element={<HFTIRegister />} />
               <Route path="/register" element={<MemoRegister />} />
               <Route path="/verify" element={<VerifyReplies />} />

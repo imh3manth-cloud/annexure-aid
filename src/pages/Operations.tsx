@@ -5,7 +5,6 @@ import { db, getHFTITransactionCount } from '@/lib/db';
 import { Badge } from '@/components/ui/badge';
 
 interface PendingCounts {
-  upload: number;
   hftiRegister: number;
   register: number;
   verify: number;
@@ -16,7 +15,6 @@ interface PendingCounts {
 export const Operations = () => {
   const navigate = useNavigate();
   const [counts, setCounts] = useState<PendingCounts>({
-    upload: 0,
     hftiRegister: 0,
     register: 0,
     verify: 0,
@@ -46,7 +44,6 @@ export const Operations = () => {
       });
 
       setCounts({
-        upload: 0, // Upload doesn't have pending items
         hftiRegister: hftiCount,
         register: newMemos.length,
         verify: pendingVerify.length,
@@ -60,7 +57,6 @@ export const Operations = () => {
 
   const getCountForRoute = (route: string): number => {
     switch (route) {
-      case '/upload': return counts.upload;
       case '/hfti-register': return counts.hftiRegister;
       case '/register': return counts.register;
       case '/verify': return counts.verify;

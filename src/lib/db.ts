@@ -249,6 +249,20 @@ export const getHFTITransactionCount = async (): Promise<number> => {
   return db.hftiTransactions.count();
 };
 
+// Get HFTI date range (oldest and newest transaction dates)
+export const getHFTIDateRange = async (): Promise<{ fromDate: string | null; toDate: string | null }> => {
+  const transactions = await db.hftiTransactions.toArray();
+  if (transactions.length === 0) {
+    return { fromDate: null, toDate: null };
+  }
+  
+  const dates = transactions.map(t => t.txn_date).sort();
+  return {
+    fromDate: dates[0],
+    toDate: dates[dates.length - 1]
+  };
+};
+
 // Get HFTI transactions with filters
 export const getFilteredHFTITransactions = async (filters: {
   startDate?: string;
