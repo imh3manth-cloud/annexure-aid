@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, MemoRecord } from '@/lib/db';
+import { db, MemoRecord, generateMemosFromHFTI, getEligibleHFTICount, initSettings } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2, ArrowLeft } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2, ArrowLeft, RefreshCw, Database } from 'lucide-react';
 import { PdfFormatDialog } from '@/components/PdfFormatDialog';
 import { DespatchDialog } from '@/components/DespatchDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -33,6 +33,8 @@ export const MemoRegister = () => {
   const [pageSize, setPageSize] = useState(25);
   const [sortColumn, setSortColumn] = useState<string>('serial');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [eligibleCount, setEligibleCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
   const { toast } = useToast();
 
   const handleSort = (column: string) => {
@@ -61,12 +63,60 @@ export const MemoRegister = () => {
   );
 
   useEffect(() => {
-    loadMemos();
+    initSettings().then(() => {
+      loadMemos();
+      loadEligibleCount();
+    });
   }, []);
 
   const loadMemos = async () => {
     const allMemos = await db.memos.orderBy('serial').reverse().toArray();
     setMemos(allMemos);
+  };
+
+  const loadEligibleCount = async () => {
+    const settings = await db.settings.get('app');
+    const threshold = settings?.threshold || 10000;
+    const count = await getEligibleHFTICount(threshold);
+    setEligibleCount(count);
+  };
+
+  const handleSyncFromHFTI = async () => {
+    setSyncing(true);
+    try {
+      const settings = await db.settings.get('app');
+      const threshold = settings?.threshold || 10000;
+      const result = await generateMemosFromHFTI(threshold);
+      
+      if (result.created > 0) {
+        toast({ 
+          title: 'Sync Complete', 
+          description: `Created ${result.created} new memos from HFTI register. ${result.skipped > 0 ? `(${result.skipped} already existed)` : ''}` 
+        });
+      } else if (result.skipped > 0) {
+        toast({ 
+          title: 'No New Memos', 
+          description: `All ${result.skipped} eligible transactions already have memos.` 
+        });
+      } else {
+        toast({ 
+          title: 'No Eligible Transactions', 
+          description: 'No debit BO transactions found above threshold. Upload HFTI data first.',
+          variant: 'destructive'
+        });
+      }
+      
+      await loadMemos();
+      await loadEligibleCount();
+    } catch (error: any) {
+      toast({ 
+        title: 'Sync Failed', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const toggleSelect = (id: number) => {
@@ -313,6 +363,21 @@ export const MemoRegister = () => {
         </div>
         
         <div className="flex gap-2">
+          <Button 
+            onClick={handleSyncFromHFTI} 
+            size="sm" 
+            variant="outline"
+            disabled={syncing}
+            className="relative"
+          >
+            <RefreshCw className={cn("w-4 h-4 mr-2", syncing && "animate-spin")} />
+            Sync from HFTI
+            {eligibleCount > 0 && (
+              <Badge variant="secondary" className="ml-2 bg-primary text-primary-foreground">
+                {eligibleCount}
+              </Badge>
+            )}
+          </Button>
           <DespatchDialog onDespatchSaved={loadMemos} />
           <PdfFormatDialog />
           <Button onClick={handleExportExcel} size="sm" variant="outline">
