@@ -340,7 +340,19 @@ export const generateMemosFromHFTI = async (
   
   // Get last balance records for account details
   const balanceRecords = await db.lastBalanceRecords.toArray();
-  const balanceByAccount = new Map(balanceRecords.map(r => [r.account, r]));
+  
+  // Create lookup map with normalized account numbers
+  const balanceByAccount = new Map<string, typeof balanceRecords[0]>();
+  for (const r of balanceRecords) {
+    // Store with original account
+    balanceByAccount.set(r.account, r);
+    // Also store with normalized version (no leading zeros)
+    const normalized = r.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+    balanceByAccount.set(normalized, r);
+  }
+  
+  console.log('Balance records count:', balanceRecords.length);
+  console.log('Balance accounts sample:', balanceRecords.slice(0, 5).map(r => r.account));
   
   const newMemos: MemoRecord[] = [];
   
@@ -353,8 +365,16 @@ export const generateMemosFromHFTI = async (
       continue;
     }
     
-    // Get account details from last balance
-    const accountInfo = balanceByAccount.get(txn.account);
+    // Get account details from last balance - try multiple formats
+    const normalizedTxnAccount = txn.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+    let accountInfo = balanceByAccount.get(txn.account) || balanceByAccount.get(normalizedTxnAccount);
+    
+    // Debug logging
+    if (!accountInfo) {
+      console.log('No match for HFTI account:', txn.account, 'normalized:', normalizedTxnAccount);
+    } else {
+      console.log('Found match for account:', txn.account, '->', accountInfo.name);
+    }
     
     // Detect BO code from particulars
     const bo = detectBOFromConfig(txn.particulars);
