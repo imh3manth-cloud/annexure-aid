@@ -313,3 +313,104 @@ export const getDebitBOTransactions = async (): Promise<HFTITransactionRecord[]>
 export const clearHFTITransactions = async (): Promise<void> => {
   await db.hftiTransactions.clear();
 };
+
+// ============ Generate Memos from HFTI Transactions ============
+
+import { detectBOFromConfig } from './config';
+
+// Generate memos from HFTI debit BO transactions
+export const generateMemosFromHFTI = async (
+  threshold: number = 10000
+): Promise<{ created: number; skipped: number; errors: string[] }> => {
+  const errors: string[] = [];
+  let created = 0;
+  let skipped = 0;
+  
+  // Get current settings for serial number
+  const settings = await db.settings.get('app');
+  let lastSerial = settings?.lastSerial || 0;
+  
+  // Get all debit BO transactions above threshold
+  const debitTransactions = await getDebitBOTransactions();
+  const eligibleTransactions = debitTransactions.filter(t => t.amount >= threshold);
+  
+  // Get existing memos to check for duplicates (by txn_id + account)
+  const existingMemos = await db.memos.toArray();
+  const existingKeys = new Set(existingMemos.map(m => `${m.txn_id}|${m.account}`));
+  
+  // Get last balance records for account details
+  const balanceRecords = await db.lastBalanceRecords.toArray();
+  const balanceByAccount = new Map(balanceRecords.map(r => [r.account, r]));
+  
+  const newMemos: MemoRecord[] = [];
+  
+  for (const txn of eligibleTransactions) {
+    const memoKey = `${txn.txn_id}|${txn.account}`;
+    
+    // Skip if memo already exists
+    if (existingKeys.has(memoKey)) {
+      skipped++;
+      continue;
+    }
+    
+    // Get account details from last balance
+    const accountInfo = balanceByAccount.get(txn.account);
+    
+    // Detect BO code from particulars
+    const bo = detectBOFromConfig(txn.particulars);
+    
+    lastSerial++;
+    
+    const memo: MemoRecord = {
+      serial: lastSerial,
+      memoKey,
+      account: txn.account,
+      txn_id: txn.txn_id,
+      amount: txn.amount,
+      txn_date: txn.txn_date,
+      name: accountInfo?.name || 'Unknown',
+      address: accountInfo?.address || '',
+      balance: accountInfo?.balance || 0,
+      balance_date: accountInfo?.balance_date || '',
+      BO_Code: bo.code,
+      BO_Name: bo.name,
+      status: 'New',
+      printed: false,
+      memo_sent_date: null,
+      reminder_count: 0,
+      last_reminder_date: null,
+      verified_date: null,
+      reported_date: null,
+      remarks: '',
+      created_at: new Date().toISOString()
+    };
+    
+    newMemos.push(memo);
+    existingKeys.add(memoKey); // Prevent duplicates in same batch
+    created++;
+  }
+  
+  // Bulk add new memos
+  if (newMemos.length > 0) {
+    await db.memos.bulkAdd(newMemos);
+    // Update last serial in settings
+    await db.settings.update('app', { lastSerial });
+  }
+  
+  return { created, skipped, errors };
+};
+
+// Get count of eligible HFTI transactions (debit BO above threshold)
+export const getEligibleHFTICount = async (threshold: number = 10000): Promise<number> => {
+  const debitTransactions = await getDebitBOTransactions();
+  
+  // Get existing memos
+  const existingMemos = await db.memos.toArray();
+  const existingKeys = new Set(existingMemos.map(m => `${m.txn_id}|${m.account}`));
+  
+  // Count eligible transactions not already in memos
+  return debitTransactions.filter(t => 
+    t.amount >= threshold && 
+    !existingKeys.has(`${t.txn_id}|${t.account}`)
+  ).length;
+};
