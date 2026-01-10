@@ -434,3 +434,12 @@ export const getEligibleHFTICount = async (threshold: number = 10000): Promise<n
     !existingKeys.has(`${t.txn_id}|${t.account}`)
   ).length;
 };
+
+// Clear all memos
+export const clearAllMemos = async (): Promise<number> => {
+  const count = await db.memos.count();
+  await db.memos.clear();
+  // Reset serial counter
+  await db.settings.update('app', { lastSerial: 0 });
+  return count;
+};

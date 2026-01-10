@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, MemoRecord, generateMemosFromHFTI, getEligibleHFTICount, initSettings } from '@/lib/db';
+import { db, MemoRecord, generateMemosFromHFTI, getEligibleHFTICount, initSettings, clearAllMemos, getLastBalanceCount } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2, ArrowLeft, RefreshCw, Database } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2, ArrowLeft, RefreshCw, Database, Trash2, AlertTriangle } from 'lucide-react';
 import { PdfFormatDialog } from '@/components/PdfFormatDialog';
 import { DespatchDialog } from '@/components/DespatchDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,6 +35,8 @@ export const MemoRegister = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [eligibleCount, setEligibleCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [balanceCount, setBalanceCount] = useState(0);
+  const [clearing, setClearing] = useState(false);
   const { toast } = useToast();
 
   const handleSort = (column: string) => {
@@ -79,6 +81,34 @@ export const MemoRegister = () => {
     const threshold = settings?.threshold || 10000;
     const count = await getEligibleHFTICount(threshold);
     setEligibleCount(count);
+    
+    // Check if last balance data exists
+    const balCount = await getLastBalanceCount();
+    setBalanceCount(balCount);
+  };
+
+  const handleClearMemos = async () => {
+    if (!confirm('Are you sure you want to clear all memos? This cannot be undone.')) {
+      return;
+    }
+    setClearing(true);
+    try {
+      const count = await clearAllMemos();
+      toast({ 
+        title: 'Memos Cleared', 
+        description: `Removed ${count} memos. Serial counter reset.` 
+      });
+      await loadMemos();
+      await loadEligibleCount();
+    } catch (error: any) {
+      toast({ 
+        title: 'Clear Failed', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
+    } finally {
+      setClearing(false);
+    }
   };
 
   const handleSyncFromHFTI = async () => {
@@ -378,6 +408,16 @@ export const MemoRegister = () => {
               </Badge>
             )}
           </Button>
+          <Button 
+            onClick={handleClearMemos} 
+            size="sm" 
+            variant="outline"
+            disabled={clearing || memos.length === 0}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Clear All
+          </Button>
           <DespatchDialog onDespatchSaved={loadMemos} />
           <PdfFormatDialog />
           <Button onClick={handleExportExcel} size="sm" variant="outline">
@@ -392,6 +432,16 @@ export const MemoRegister = () => {
           )}
         </div>
       </div>
+
+      {/* Warning if no Last Balance data */}
+      {balanceCount === 0 && (
+        <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/30 rounded-lg text-warning">
+          <AlertTriangle className="w-5 h-5 shrink-0" />
+          <span className="text-sm">
+            <strong>Last Balance data not uploaded!</strong> Name and address will show as "Unknown" until you upload Last Balance CSV from Account Details.
+          </span>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
