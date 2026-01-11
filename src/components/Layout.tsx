@@ -1,9 +1,11 @@
 import { NavLink } from './NavLink';
 import { ThemeSelector } from './ThemeSelector';
-import { LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, LogOut } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig } from '@/lib/config';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,9 +23,15 @@ export const Layout = ({ children }: LayoutProps) => {
   const [subdivision, setSubdivision] = useState('T NARASIPURA SUB DIVISION');
   const navigate = useNavigate();
   const location = useLocation();
+  const { signOut, user } = useAuth();
 
   const isOperationsPage = menuItems.some(item => location.pathname === item.to);
   const showOperationsGrid = location.pathname === '/operations';
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   useEffect(() => {
     const loadConfig = () => {
@@ -66,9 +74,21 @@ export const Layout = ({ children }: LayoutProps) => {
             </div>
             <div className="flex items-center gap-4">
               <div className="text-sm text-muted-foreground">
+                {user?.email}
+              </div>
+              <div className="text-sm text-muted-foreground">
                 {subdivision}
               </div>
               <ThemeSelector />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleSignOut}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <LogOut className="h-4 w-4 mr-1" />
+                Sign Out
+              </Button>
             </div>
           </div>
         </div>
