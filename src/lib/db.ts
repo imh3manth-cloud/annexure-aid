@@ -443,3 +443,44 @@ export const clearAllMemos = async (): Promise<number> => {
   await db.settings.update('app', { lastSerial: 0 });
   return count;
 };
+
+// Sync memo names and addresses from Last Balance records
+export const syncMemoNamesFromBalance = async (): Promise<{ updated: number; notFound: number }> => {
+  const memos = await db.memos.toArray();
+  const balanceRecords = await db.lastBalanceRecords.toArray();
+  
+  if (balanceRecords.length === 0) {
+    return { updated: 0, notFound: memos.length };
+  }
+  
+  // Create lookup map with multiple account formats
+  const balanceByAccount = new Map<string, typeof balanceRecords[0]>();
+  for (const r of balanceRecords) {
+    balanceByAccount.set(r.account, r);
+    const normalized = r.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+    balanceByAccount.set(normalized, r);
+  }
+  
+  let updated = 0;
+  let notFound = 0;
+  
+  for (const memo of memos) {
+    const normalizedAccount = memo.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
+    const accountInfo = balanceByAccount.get(memo.account) || balanceByAccount.get(normalizedAccount);
+    
+    if (accountInfo) {
+      // Update memo with name/address from balance record
+      await db.memos.update(memo.id!, {
+        name: accountInfo.name,
+        address: accountInfo.address,
+        balance: accountInfo.balance,
+        balance_date: accountInfo.balance_date
+      });
+      updated++;
+    } else {
+      notFound++;
+    }
+  }
+  
+  return { updated, notFound };
+};
