@@ -14,7 +14,228 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          created_at: string | null
+          group_by_bo: boolean | null
+          id: string
+          last_serial: number | null
+          threshold: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          group_by_bo?: boolean | null
+          id?: string
+          last_serial?: number | null
+          threshold?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          group_by_bo?: boolean | null
+          id?: string
+          last_serial?: number | null
+          threshold?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      despatch_records: {
+        Row: {
+          created_at: string | null
+          despatch_date: string
+          from_memo: number
+          id: string
+          memo_count: number
+          post_number: string
+          to_memo: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          despatch_date: string
+          from_memo: number
+          id?: string
+          memo_count: number
+          post_number: string
+          to_memo: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          despatch_date?: string
+          from_memo?: number
+          id?: string
+          memo_count?: number
+          post_number?: string
+          to_memo?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      hfti_transactions: {
+        Row: {
+          account: string
+          amount: number
+          bo_reference: string | null
+          debit_credit: string
+          id: string
+          particulars: string | null
+          source_file: string | null
+          txn_date: string
+          txn_id: string
+          uploaded_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account: string
+          amount: number
+          bo_reference?: string | null
+          debit_credit: string
+          id?: string
+          particulars?: string | null
+          source_file?: string | null
+          txn_date: string
+          txn_id: string
+          uploaded_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account?: string
+          amount?: number
+          bo_reference?: string | null
+          debit_credit?: string
+          id?: string
+          particulars?: string | null
+          source_file?: string | null
+          txn_date?: string
+          txn_id?: string
+          uploaded_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      last_balance_records: {
+        Row: {
+          account: string
+          address: string | null
+          balance: number | null
+          balance_date: string | null
+          bo_name: string | null
+          id: string
+          name: string
+          scheme_type: string | null
+          uploaded_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account: string
+          address?: string | null
+          balance?: number | null
+          balance_date?: string | null
+          bo_name?: string | null
+          id?: string
+          name: string
+          scheme_type?: string | null
+          uploaded_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account?: string
+          address?: string | null
+          balance?: number | null
+          balance_date?: string | null
+          bo_name?: string | null
+          id?: string
+          name?: string
+          scheme_type?: string | null
+          uploaded_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      memos: {
+        Row: {
+          account: string
+          address: string | null
+          amount: number
+          balance: number | null
+          balance_date: string | null
+          bo_code: string | null
+          bo_name: string | null
+          created_at: string | null
+          id: string
+          last_reminder_date: string | null
+          memo_key: string
+          memo_sent_date: string | null
+          name: string | null
+          printed: boolean | null
+          remarks: string | null
+          reminder_count: number | null
+          reported_date: string | null
+          serial: number
+          status: string
+          txn_date: string
+          txn_id: string
+          user_id: string
+          verified_date: string | null
+        }
+        Insert: {
+          account: string
+          address?: string | null
+          amount: number
+          balance?: number | null
+          balance_date?: string | null
+          bo_code?: string | null
+          bo_name?: string | null
+          created_at?: string | null
+          id?: string
+          last_reminder_date?: string | null
+          memo_key: string
+          memo_sent_date?: string | null
+          name?: string | null
+          printed?: boolean | null
+          remarks?: string | null
+          reminder_count?: number | null
+          reported_date?: string | null
+          serial: number
+          status?: string
+          txn_date: string
+          txn_id: string
+          user_id: string
+          verified_date?: string | null
+        }
+        Update: {
+          account?: string
+          address?: string | null
+          amount?: number
+          balance?: number | null
+          balance_date?: string | null
+          bo_code?: string | null
+          bo_name?: string | null
+          created_at?: string | null
+          id?: string
+          last_reminder_date?: string | null
+          memo_key?: string
+          memo_sent_date?: string | null
+          name?: string | null
+          printed?: boolean | null
+          remarks?: string | null
+          reminder_count?: number | null
+          reported_date?: string | null
+          serial?: number
+          status?: string
+          txn_date?: string
+          txn_id?: string
+          user_id?: string
+          verified_date?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
