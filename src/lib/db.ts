@@ -433,10 +433,10 @@ export const clearLastBalanceRecords = async (): Promise<void> => {
     .eq('user_id', userId);
 };
 
-export const updateLastBalanceRecord = async (id: string | number, updates: Partial<LastBalanceRecord>) => {
+export const updateLastBalanceRecord = async (id: string | number, updates: Partial<Omit<LastBalanceRecord, 'id' | 'uploaded_at'>>) => {
   await supabase
     .from('last_balance_records')
-    .update(updates)
+    .update(updates as any)
     .eq('id', String(id));
 };
 
@@ -845,10 +845,20 @@ export const db = {
               }
               const memos = await getAllMemos();
               return memos.filter((m: any) => m[field] === value);
+            },
+            async sortBy(sortField: string) {
+              const memos = field === 'status' 
+                ? await getMemosByStatus(value) 
+                : (await getAllMemos()).filter((m: any) => m[field] === value);
+              return memos.sort((a: any, b: any) => {
+                if (a[sortField] < b[sortField]) return -1;
+                if (a[sortField] > b[sortField]) return 1;
+                return 0;
+              });
             }
           };
         },
-        between(low: number, high: number) {
+        between(low: number, high: number, includeLow = true, includeHigh = true) {
           return {
             async toArray() {
               return getMemosBySerialRange(low, high);
@@ -894,12 +904,22 @@ export const db = {
       }
       return null;
     },
+    async toArray() {
+      const settings = await getSettings();
+      return settings ? [settings] : [];
+    },
     async update(id: string, updates: Partial<AppSettings>) {
       if (id === 'app') {
         await updateSettings(updates);
       }
     },
     async add(settings: AppSettings) {
+      await initSettings();
+    },
+    async clear() {
+      // Settings are per-user and managed automatically
+    },
+    async bulkAdd(settingsArray: AppSettings[]) {
       await initSettings();
     }
   },
