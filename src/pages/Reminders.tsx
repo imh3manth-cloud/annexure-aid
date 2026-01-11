@@ -17,8 +17,8 @@ export const Reminders = () => {
   const navigate = useNavigate();
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
   const [overdueMemos, setOverdueMemos] = useState<MemoRecord[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [overdueSelected, setOverdueSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
+  const [overdueSelected, setOverdueSelected] = useState<Set<string | number>>(new Set());
   const [reminderDate, setReminderDate] = useState(new Date().toISOString().split('T')[0]);
   const { toast } = useToast();
 
@@ -55,7 +55,7 @@ export const Reminders = () => {
     setOverdueMemos(overdue);
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string | number) => {
     const newSelected = new Set(selected);
     if (newSelected.has(id)) {
       newSelected.delete(id);
@@ -73,7 +73,7 @@ export const Reminders = () => {
     }
   };
 
-  const toggleOverdueSelect = (id: number) => {
+  const toggleOverdueSelect = (id: string | number) => {
     const newSelected = new Set(overdueSelected);
     if (newSelected.has(id)) {
       newSelected.delete(id);

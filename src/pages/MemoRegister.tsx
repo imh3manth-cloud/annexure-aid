@@ -23,7 +23,7 @@ import * as XLSX from 'xlsx';
 export const MemoRegister = () => {
   const navigate = useNavigate();
   const [memos, setMemos] = useState<MemoRecord[]>([]);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<string | number>>(new Set());
   const [filter, setFilter] = useState<'all' | 'New' | 'Pending' | 'Verified' | 'Reported'>('all');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
@@ -185,7 +185,7 @@ export const MemoRegister = () => {
     }
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string | number) => {
     const newSelected = new Set(selected);
     if (newSelected.has(id)) {
       newSelected.delete(id);
