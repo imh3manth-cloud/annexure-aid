@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, MemoRecord, generateMemosFromHFTI, getEligibleHFTICount, initSettings, clearAllMemos, getLastBalanceCount } from '@/lib/db';
+import { db, MemoRecord, generateMemosFromHFTI, getEligibleHFTICount, initSettings, clearAllMemos, getLastBalanceCount, syncMemoNamesFromBalance } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
-import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2, ArrowLeft, RefreshCw, Database, Trash2, AlertTriangle } from 'lucide-react';
+import { Printer, FileSpreadsheet, Download, CalendarIcon, X, Search, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Settings2, ArrowLeft, RefreshCw, Database, Trash2, AlertTriangle, UserCheck } from 'lucide-react';
 import { PdfFormatDialog } from '@/components/PdfFormatDialog';
 import { DespatchDialog } from '@/components/DespatchDialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -37,6 +37,7 @@ export const MemoRegister = () => {
   const [syncing, setSyncing] = useState(false);
   const [balanceCount, setBalanceCount] = useState(0);
   const [clearing, setClearing] = useState(false);
+  const [syncingNames, setSyncingNames] = useState(false);
   const { toast } = useToast();
 
   const handleSort = (column: string) => {
@@ -108,6 +109,41 @@ export const MemoRegister = () => {
       });
     } finally {
       setClearing(false);
+    }
+  };
+
+  const handleSyncNames = async () => {
+    setSyncingNames(true);
+    try {
+      const result = await syncMemoNamesFromBalance();
+      
+      if (result.updated > 0) {
+        toast({ 
+          title: 'Names Synced', 
+          description: `Updated ${result.updated} memos with name/address from Last Balance.${result.notFound > 0 ? ` ${result.notFound} accounts not found.` : ''}` 
+        });
+      } else if (result.notFound > 0) {
+        toast({ 
+          title: 'No Matches Found', 
+          description: `Could not find balance records for ${result.notFound} accounts. Upload Last Balance data first.`,
+          variant: 'destructive'
+        });
+      } else {
+        toast({ 
+          title: 'No Memos to Update', 
+          description: 'No memos exist to sync names for.'
+        });
+      }
+      
+      await loadMemos();
+    } catch (error: any) {
+      toast({ 
+        title: 'Sync Failed', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
+    } finally {
+      setSyncingNames(false);
     }
   };
 
@@ -407,6 +443,16 @@ export const MemoRegister = () => {
                 {eligibleCount}
               </Badge>
             )}
+          </Button>
+          <Button 
+            onClick={handleSyncNames} 
+            size="sm" 
+            variant="outline"
+            disabled={syncingNames || memos.length === 0 || balanceCount === 0}
+            title="Update memo names/addresses from Last Balance data"
+          >
+            <UserCheck className={cn("w-4 h-4 mr-2", syncingNames && "animate-pulse")} />
+            Sync Names
           </Button>
           <Button 
             onClick={handleClearMemos} 
