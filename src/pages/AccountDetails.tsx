@@ -11,13 +11,22 @@ import {
   getLastBalanceDate,
   clearLastBalanceRecords 
 } from '@/lib/db';
-import { Upload, Database, Trash2, RefreshCw } from 'lucide-react';
+import { Upload, Database, Trash2, RefreshCw, Eye } from 'lucide-react';
 import { BalanceRecordsViewer } from '@/components/BalanceRecordsViewer';
+import { BalancePreviewDialog } from '@/components/BalancePreviewDialog';
+
+interface ParsedFileData {
+  records: LastBalanceRecord[];
+  preparedDate: string;
+  fileName: string;
+}
 
 export const AccountDetails = () => {
   const [balanceFiles, setBalanceFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [savedBalanceInfo, setSavedBalanceInfo] = useState<{ count: number; date: string | null }>({ count: 0, date: null });
+  const [previewData, setPreviewData] = useState<ParsedFileData | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -41,7 +50,7 @@ export const AccountDetails = () => {
     }
   };
 
-  const handleUploadBalance = async () => {
+  const handleParseAndPreview = async () => {
     if (balanceFiles.length === 0) {
       toast({
         title: 'No files selected',
@@ -53,45 +62,86 @@ export const AccountDetails = () => {
 
     setProcessing(true);
     try {
-      const newBalanceRecords: LastBalanceRecord[] = [];
+      const allRecords: LastBalanceRecord[] = [];
+      let latestDate = '';
+      const fileNames: string[] = [];
       
       for (const file of balanceFiles) {
-        const { records } = await parseLastBalanceCSV(file);
-        newBalanceRecords.push(...records);
+        const { records, preparedDate } = await parseLastBalanceCSV(file);
+        allRecords.push(...records);
+        if (preparedDate > latestDate) latestDate = preparedDate;
+        fileNames.push(file.name);
       }
 
-      if (newBalanceRecords.length > 0) {
-        const savedCount = await saveLastBalanceRecords(newBalanceRecords.map(r => ({
-          account: r.account,
-          name: r.name,
-          address: r.address,
-          balance: r.balance,
-          balance_date: r.balance_date,
-          bo_name: r.bo_name,
-          scheme_type: r.scheme_type
-        })));
-
-        await loadSavedBalanceInfo();
-
+      if (allRecords.length === 0) {
         toast({
-          title: 'Balance data saved',
-          description: `Saved ${savedCount} balance records`
+          title: 'No records found',
+          description: 'Could not parse any valid records from the selected file(s)',
+          variant: 'destructive'
         });
-
-        setBalanceFiles([]);
-        // Reset the file input
-        const fileInput = document.getElementById('balance-upload') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
+        return;
       }
+
+      setPreviewData({
+        records: allRecords,
+        preparedDate: latestDate,
+        fileName: fileNames.join(', ')
+      });
+      setShowPreview(true);
     } catch (error: any) {
       toast({
-        title: 'Upload failed',
+        title: 'Parse failed',
         description: error.message,
         variant: 'destructive'
       });
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleConfirmSave = async () => {
+    if (!previewData) return;
+
+    setProcessing(true);
+    try {
+      const savedCount = await saveLastBalanceRecords(previewData.records.map(r => ({
+        account: r.account,
+        name: r.name,
+        address: r.address,
+        balance: r.balance,
+        balance_date: r.balance_date,
+        bo_name: r.bo_name,
+        scheme_type: r.scheme_type
+      })));
+
+      await loadSavedBalanceInfo();
+
+      toast({
+        title: 'Balance data saved',
+        description: `Saved ${savedCount} balance records`
+      });
+
+      setBalanceFiles([]);
+      setPreviewData(null);
+      setShowPreview(false);
+      
+      // Reset the file input
+      const fileInput = document.getElementById('balance-upload') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
+    } catch (error: any) {
+      toast({
+        title: 'Save failed',
+        description: error.message,
+        variant: 'destructive'
+      });
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleCancelPreview = () => {
+    setShowPreview(false);
+    setPreviewData(null);
   };
 
   return (
@@ -176,17 +226,30 @@ export const AccountDetails = () => {
           </div>
 
           <Button 
-            onClick={handleUploadBalance} 
+            onClick={handleParseAndPreview} 
             disabled={processing || balanceFiles.length === 0}
           >
-            <Upload className="w-4 h-4 mr-2" />
-            {processing ? 'Processing...' : 'Upload & Save'}
+            <Eye className="w-4 h-4 mr-2" />
+            {processing ? 'Parsing...' : 'Preview & Upload'}
           </Button>
         </CardContent>
       </Card>
 
       {/* Balance Records Viewer */}
       <BalanceRecordsViewer />
+
+      {/* Preview Dialog */}
+      {previewData && (
+        <BalancePreviewDialog
+          open={showPreview}
+          onOpenChange={setShowPreview}
+          records={previewData.records}
+          preparedDate={previewData.preparedDate}
+          fileName={previewData.fileName}
+          onConfirm={handleConfirmSave}
+          onCancel={handleCancelPreview}
+        />
+      )}
     </div>
   );
 };
