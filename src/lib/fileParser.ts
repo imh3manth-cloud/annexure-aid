@@ -20,6 +20,25 @@ export interface LastBalanceRecord {
   scheme_type: string;
 }
 
+export interface ColumnMapping {
+  account: number | null;
+  name: number | null;
+  name2: number | null;
+  address: number | null;
+  balance: number | null;
+  scheme_type: number | null;
+  status: number | null;
+  bo_name: number | null;
+}
+
+export interface RawCSVData {
+  headers: string[];
+  rows: string[][];
+  preparedDate: string;
+  autoMapping: ColumnMapping;
+  headerRowIndex: number;
+}
+
 // Normalize header names
 const normalizeHeader = (header: string): string => {
   return header
@@ -117,224 +136,226 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
   });
 };
 
-// Parse Last Balance CSV files
-export const parseLastBalanceCSV = (file: File): Promise<{ records: LastBalanceRecord[]; preparedDate: string }> => {
+// Extract raw CSV data for manual mapping
+export const extractRawCSVData = (file: File): Promise<RawCSVData> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
-      header: false, // Parse without headers to handle complex structure
+      header: false,
       skipEmptyLines: true,
       complete: (results) => {
         try {
-          const records: LastBalanceRecord[] = [];
-          const rows = results.data as any[][];
+          const rows = results.data as string[][];
           
-          // Try to extract prepared date from the file
+          // Extract prepared date
           let preparedDate = new Date().toISOString().split('T')[0];
-          
-          // Search in first 15 rows for "Prepared Date" or similar
           for (let i = 0; i < Math.min(15, rows.length); i++) {
             const row = rows[i];
             const rowText = row.join(' ').toLowerCase();
             
-            // Look for prepared date patterns
             if (rowText.includes('prepared') || rowText.includes('date') || rowText.includes('as on') || rowText.includes('timestamp')) {
               for (let j = 0; j < row.length; j++) {
                 const cell = String(row[j] || '').trim();
-                // Try to match date patterns like DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD
                 const dateMatch = cell.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
                 if (dateMatch) {
                   const [, d1, d2, year] = dateMatch;
                   const fullYear = year.length === 2 ? `20${year}` : year;
-                  // Determine if d1/d2 is day/month or month/day
                   const day = parseInt(d1) > 12 ? d1 : d2;
                   const month = parseInt(d1) > 12 ? d2 : d1;
                   preparedDate = `${fullYear}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                  console.log('Extracted date:', preparedDate, 'from cell:', cell);
                   break;
                 }
               }
             }
           }
           
-          // Find the header row and detect column indices dynamically
+          // Find header row and auto-detect mappings
           let headerRowIndex = -1;
-          let columnMap: { [key: string]: number } = {};
+          let autoMapping: ColumnMapping = {
+            account: null,
+            name: null,
+            name2: null,
+            address: null,
+            balance: null,
+            scheme_type: null,
+            status: null,
+            bo_name: null
+          };
           
           for (let i = 0; i < Math.min(20, rows.length); i++) {
             const row = rows[i];
             const rowStr = row.map((c: any) => String(c || '').toLowerCase()).join('|');
             
-            // Check if this row contains typical header columns
             if (rowStr.includes('account') && (rowStr.includes('name') || rowStr.includes('cust'))) {
               headerRowIndex = i;
               
-              // Map each column by its header
               row.forEach((cell: any, idx: number) => {
-                const header = normalizeHeader(String(cell || ''));
                 const headerLower = String(cell || '').toLowerCase().trim();
                 
-                // Account number detection
-                if (headerLower.includes('account') && (headerLower.includes('number') || headerLower.includes('no'))) {
-                  columnMap['account'] = idx;
-                }
-                // Scheme type detection  
-                else if (headerLower.includes('scheme') || headerLower.includes('product')) {
-                  columnMap['scheme_type'] = idx;
-                }
-                // Status detection
-                else if (headerLower.includes('status') || headerLower.includes('a/c status') || headerLower.includes('account status')) {
-                  columnMap['status'] = idx;
-                }
-                // Name detection (first name field found)
-                else if ((headerLower.includes('cust') && headerLower.includes('name')) || 
-                         headerLower === 'name' || headerLower === 'customer name') {
-                  if (!columnMap['name']) columnMap['name'] = idx;
-                  else if (!columnMap['name2']) columnMap['name2'] = idx;
-                }
-                // Cust1/Cust2 name
-                else if (headerLower.includes('cust1') || headerLower.includes('cust 1')) {
-                  columnMap['name'] = idx;
-                }
-                else if (headerLower.includes('cust2') || headerLower.includes('cust 2')) {
-                  columnMap['name2'] = idx;
-                }
-                // Address detection
-                else if (headerLower.includes('address') || headerLower.includes('addr')) {
-                  columnMap['address'] = idx;
-                }
-                // Balance detection
-                else if (headerLower.includes('balance') || headerLower.includes('bal') || 
-                         headerLower.includes('outstanding') || headerLower.includes('amount')) {
-                  if (!columnMap['balance']) columnMap['balance'] = idx;
-                }
-                // BO Name detection
-                else if (headerLower.includes('bo') || headerLower.includes('branch') || 
-                         headerLower.includes('office name') || headerLower.includes('so name')) {
-                  columnMap['bo_name'] = idx;
+                if (headerLower.includes('account') && (headerLower.includes('number') || headerLower.includes('no') || headerLower.includes('id'))) {
+                  autoMapping.account = idx;
+                } else if (headerLower.includes('scheme') || headerLower.includes('product')) {
+                  autoMapping.scheme_type = idx;
+                } else if (headerLower.includes('status') || headerLower.includes('a/c status') || headerLower.includes('account status')) {
+                  autoMapping.status = idx;
+                } else if ((headerLower.includes('cust') && headerLower.includes('name')) || 
+                           headerLower === 'name' || headerLower === 'customer name') {
+                  if (autoMapping.name === null) autoMapping.name = idx;
+                  else if (autoMapping.name2 === null) autoMapping.name2 = idx;
+                } else if (headerLower.includes('cust1') || headerLower.includes('cust 1')) {
+                  autoMapping.name = idx;
+                } else if (headerLower.includes('cust2') || headerLower.includes('cust 2')) {
+                  autoMapping.name2 = idx;
+                } else if (headerLower.includes('address') || headerLower.includes('addr')) {
+                  autoMapping.address = idx;
+                } else if (headerLower.includes('balance') || headerLower.includes('bal') || 
+                           headerLower.includes('outstanding') || headerLower.includes('amount')) {
+                  if (autoMapping.balance === null) autoMapping.balance = idx;
+                } else if (headerLower.includes('bo') || headerLower.includes('branch') || 
+                           headerLower.includes('office name') || headerLower.includes('so name')) {
+                  autoMapping.bo_name = idx;
                 }
               });
-              
-              console.log('Header row found at index:', headerRowIndex);
-              console.log('Headers:', row);
-              console.log('Column mapping:', columnMap);
               break;
             }
           }
           
           if (headerRowIndex === -1) {
-            console.error('Could not find header row in CSV. First 5 rows:', rows.slice(0, 5));
-            reject(new Error('Could not find header row with "Account" and "Name" columns in CSV'));
-            return;
-          }
-          
-          // Parse data rows after header
-          for (let i = headerRowIndex + 1; i < rows.length; i++) {
-            const row = rows[i];
-            
-            // Skip rows that don't have enough columns
-            if (!row || row.length < 5) continue;
-            
-            // Extract account number
-            const accountIdx = columnMap['account'] ?? 1;
-            const accountRaw = String(row[accountIdx] || '').trim();
-            let account = accountRaw.replace(/\D/g, '');
-            account = account.replace(/^0+/, '') || '0';
-            
-            // Skip if no valid account number
-            if (!account || account === '' || account === '0' || isNaN(Number(account))) continue;
-            
-            // Extract name (may have cust1 and cust2)
-            let name = '';
-            if (columnMap['name'] !== undefined) {
-              name = String(row[columnMap['name']] || '').trim();
-            }
-            if (columnMap['name2'] !== undefined) {
-              const name2 = String(row[columnMap['name2']] || '').trim();
-              if (name2 && name2 !== ',' && name2 !== ' ') {
-                name = name ? `${name} ${name2}`.trim() : name2;
+            // Fallback: use first row with multiple columns as header
+            for (let i = 0; i < Math.min(10, rows.length); i++) {
+              if (rows[i].length >= 5) {
+                headerRowIndex = i;
+                break;
               }
             }
-            
-            // Skip rows without names (likely empty or footer rows)
-            if (!name) continue;
-            
-            // Extract address
-            let address = '';
-            if (columnMap['address'] !== undefined) {
-              address = String(row[columnMap['address']] || '').trim();
-            }
-            
-            // Extract balance - try mapped column first, then look for numeric values
-            let balance = 0;
-            if (columnMap['balance'] !== undefined) {
-              const balanceRaw = String(row[columnMap['balance']] || '0').trim();
-              balance = parseFloat(balanceRaw.replace(/[^0-9.-]/g, '')) || 0;
-            }
-            
-            // If balance is 0, try scanning for a numeric column that looks like a balance
-            if (balance === 0) {
-              for (let colIdx = 0; colIdx < row.length; colIdx++) {
-                const cellValue = String(row[colIdx] || '').trim();
-                // Look for values that look like currency amounts (numbers with optional decimals)
-                if (/^\d{1,3}(,?\d{3})*(\.\d{1,2})?$/.test(cellValue.replace(/[₹Rs\s]/g, ''))) {
-                  const parsed = parseFloat(cellValue.replace(/[^0-9.-]/g, ''));
-                  if (!isNaN(parsed) && parsed > 100) { // Assume balances are > 100
-                    balance = parsed;
-                    break;
-                  }
-                }
-              }
-            }
-            
-            // Extract scheme type
-            let schemeType = '';
-            if (columnMap['scheme_type'] !== undefined) {
-              schemeType = String(row[columnMap['scheme_type']] || '').trim();
-            }
-            
-            // Extract status (may be combined with scheme or separate)
-            let status = '';
-            if (columnMap['status'] !== undefined) {
-              status = String(row[columnMap['status']] || '').trim();
-            }
-            // Append status to scheme_type if both exist
-            if (status && schemeType) {
-              schemeType = `${schemeType} (${status})`;
-            } else if (status) {
-              schemeType = status;
-            }
-            
-            // Extract BO Name (fallback to last column)
-            let boName = '';
-            if (columnMap['bo_name'] !== undefined) {
-              boName = String(row[columnMap['bo_name']] || '').trim();
-            } else {
-              // Fallback: use last non-empty column
-              boName = String(row[row.length - 1] || '').trim();
-            }
-            
-            console.log('Parsed record:', { account, name, address, balance, schemeType, boName });
-            
-            records.push({
-              account,
-              name,
-              address,
-              balance,
-              balance_date: preparedDate,
-              bo_name: boName,
-              scheme_type: schemeType
-            });
           }
           
-          console.log(`Parsed ${records.length} balance records from ${file.name}`);
-          resolve({ records, preparedDate });
+          const headers = headerRowIndex >= 0 ? rows[headerRowIndex].map(h => String(h || '').trim()) : [];
+          const dataRows = headerRowIndex >= 0 ? rows.slice(headerRowIndex + 1) : rows;
+          
+          resolve({
+            headers,
+            rows: dataRows,
+            preparedDate,
+            autoMapping,
+            headerRowIndex
+          });
         } catch (error) {
-          console.error('Error parsing CSV:', error);
           reject(error);
         }
       },
       error: (error) => reject(error)
     });
+  });
+};
+
+// Apply column mapping to raw data to create records
+export const applyColumnMapping = (
+  rawData: RawCSVData,
+  mapping: ColumnMapping
+): LastBalanceRecord[] => {
+  const records: LastBalanceRecord[] = [];
+  
+  for (const row of rawData.rows) {
+    if (!row || row.length < 3) continue;
+    
+    // Extract account
+    let account = '';
+    if (mapping.account !== null && row[mapping.account]) {
+      const accountRaw = String(row[mapping.account]).trim();
+      account = accountRaw.replace(/\D/g, '');
+      account = account.replace(/^0+/, '') || '0';
+    }
+    
+    if (!account || account === '0' || isNaN(Number(account))) continue;
+    
+    // Extract name
+    let name = '';
+    if (mapping.name !== null && row[mapping.name]) {
+      name = String(row[mapping.name]).trim();
+    }
+    if (mapping.name2 !== null && row[mapping.name2]) {
+      const name2 = String(row[mapping.name2]).trim();
+      if (name2 && name2 !== ',' && name2 !== ' ') {
+        name = name ? `${name} ${name2}`.trim() : name2;
+      }
+    }
+    
+    if (!name) continue;
+    
+    // Extract address
+    let address = '';
+    if (mapping.address !== null && row[mapping.address]) {
+      address = String(row[mapping.address]).trim();
+    }
+    
+    // Extract balance
+    let balance = 0;
+    if (mapping.balance !== null && row[mapping.balance]) {
+      const balanceRaw = String(row[mapping.balance]).trim();
+      balance = parseFloat(balanceRaw.replace(/[^0-9.-]/g, '')) || 0;
+    }
+    
+    // Fallback: scan for balance-like values if not mapped
+    if (balance === 0 && mapping.balance === null) {
+      for (let colIdx = 0; colIdx < row.length; colIdx++) {
+        const cellValue = String(row[colIdx] || '').trim();
+        if (/^\d{1,3}(,?\d{3})*(\.\d{1,2})?$/.test(cellValue.replace(/[₹Rs\s]/g, ''))) {
+          const parsed = parseFloat(cellValue.replace(/[^0-9.-]/g, ''));
+          if (!isNaN(parsed) && parsed > 100) {
+            balance = parsed;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Extract scheme type
+    let schemeType = '';
+    if (mapping.scheme_type !== null && row[mapping.scheme_type]) {
+      schemeType = String(row[mapping.scheme_type]).trim();
+    }
+    
+    // Extract and combine status
+    let status = '';
+    if (mapping.status !== null && row[mapping.status]) {
+      status = String(row[mapping.status]).trim();
+    }
+    if (status && schemeType) {
+      schemeType = `${schemeType} (${status})`;
+    } else if (status) {
+      schemeType = status;
+    }
+    
+    // Extract BO Name
+    let boName = '';
+    if (mapping.bo_name !== null && row[mapping.bo_name]) {
+      boName = String(row[mapping.bo_name]).trim();
+    }
+    
+    records.push({
+      account,
+      name,
+      address,
+      balance,
+      balance_date: rawData.preparedDate,
+      bo_name: boName,
+      scheme_type: schemeType
+    });
+  }
+  
+  return records;
+};
+
+// Parse Last Balance CSV files (legacy - uses auto-detection)
+export const parseLastBalanceCSV = (file: File): Promise<{ records: LastBalanceRecord[]; preparedDate: string }> => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const rawData = await extractRawCSVData(file);
+      const records = applyColumnMapping(rawData, rawData.autoMapping);
+      resolve({ records, preparedDate: rawData.preparedDate });
+    } catch (error) {
+      reject(error);
+    }
   });
 };
 

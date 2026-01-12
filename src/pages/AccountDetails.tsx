@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { parseLastBalanceCSV, LastBalanceRecord } from '@/lib/fileParser';
+import { extractRawCSVData, RawCSVData, LastBalanceRecord } from '@/lib/fileParser';
 import { 
   saveLastBalanceRecords, 
   getLastBalanceCount,
@@ -15,9 +15,8 @@ import { Upload, Database, Trash2, RefreshCw, Eye } from 'lucide-react';
 import { BalanceRecordsViewer } from '@/components/BalanceRecordsViewer';
 import { BalancePreviewDialog } from '@/components/BalancePreviewDialog';
 
-interface ParsedFileData {
-  records: LastBalanceRecord[];
-  preparedDate: string;
+interface CombinedRawData {
+  rawData: RawCSVData;
   fileName: string;
 }
 
@@ -25,7 +24,7 @@ export const AccountDetails = () => {
   const [balanceFiles, setBalanceFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
   const [savedBalanceInfo, setSavedBalanceInfo] = useState<{ count: number; date: string | null }>({ count: 0, date: null });
-  const [previewData, setPreviewData] = useState<ParsedFileData | null>(null);
+  const [previewData, setPreviewData] = useState<CombinedRawData | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const { toast } = useToast();
 
@@ -62,30 +61,34 @@ export const AccountDetails = () => {
 
     setProcessing(true);
     try {
-      const allRecords: LastBalanceRecord[] = [];
-      let latestDate = '';
-      const fileNames: string[] = [];
+      // For now, we process the first file for preview with manual mapping
+      // Multiple files will be combined with the same mapping
+      const file = balanceFiles[0];
+      const rawData = await extractRawCSVData(file);
       
-      for (const file of balanceFiles) {
-        const { records, preparedDate } = await parseLastBalanceCSV(file);
-        allRecords.push(...records);
-        if (preparedDate > latestDate) latestDate = preparedDate;
-        fileNames.push(file.name);
+      // Combine additional files if any
+      if (balanceFiles.length > 1) {
+        for (let i = 1; i < balanceFiles.length; i++) {
+          const additionalRaw = await extractRawCSVData(balanceFiles[i]);
+          rawData.rows.push(...additionalRaw.rows);
+          if (additionalRaw.preparedDate > rawData.preparedDate) {
+            rawData.preparedDate = additionalRaw.preparedDate;
+          }
+        }
       }
 
-      if (allRecords.length === 0) {
+      if (rawData.rows.length === 0) {
         toast({
-          title: 'No records found',
-          description: 'Could not parse any valid records from the selected file(s)',
+          title: 'No data found',
+          description: 'Could not find any data rows in the selected file(s)',
           variant: 'destructive'
         });
         return;
       }
 
       setPreviewData({
-        records: allRecords,
-        preparedDate: latestDate,
-        fileName: fileNames.join(', ')
+        rawData,
+        fileName: balanceFiles.map(f => f.name).join(', ')
       });
       setShowPreview(true);
     } catch (error: any) {
@@ -99,12 +102,10 @@ export const AccountDetails = () => {
     }
   };
 
-  const handleConfirmSave = async () => {
-    if (!previewData) return;
-
+  const handleConfirmSave = async (records: LastBalanceRecord[], preparedDate: string) => {
     setProcessing(true);
     try {
-      const savedCount = await saveLastBalanceRecords(previewData.records.map(r => ({
+      const savedCount = await saveLastBalanceRecords(records.map(r => ({
         account: r.account,
         name: r.name,
         address: r.address,
@@ -221,7 +222,7 @@ export const AccountDetails = () => {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              Uploading new files will add/update the saved balance data
+              Uploading new files will add/update the saved balance data. Use manual mapping if auto-detection fails.
             </p>
           </div>
 
@@ -243,8 +244,7 @@ export const AccountDetails = () => {
         <BalancePreviewDialog
           open={showPreview}
           onOpenChange={setShowPreview}
-          records={previewData.records}
-          preparedDate={previewData.preparedDate}
+          rawData={previewData.rawData}
           fileName={previewData.fileName}
           onConfirm={handleConfirmSave}
           onCancel={handleCancelPreview}

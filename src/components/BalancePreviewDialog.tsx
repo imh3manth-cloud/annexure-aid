@@ -1,10 +1,13 @@
+import { useState, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { LastBalanceRecord } from '@/lib/fileParser';
-import { CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { LastBalanceRecord, ColumnMapping, RawCSVData, applyColumnMapping } from '@/lib/fileParser';
+import { CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet, Settings2, RotateCcw } from 'lucide-react';
 
 interface ColumnDetection {
   account: boolean;
@@ -18,22 +21,42 @@ interface ColumnDetection {
 interface BalancePreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  records: LastBalanceRecord[];
-  preparedDate: string;
+  rawData: RawCSVData;
   fileName: string;
-  onConfirm: () => void;
+  onConfirm: (records: LastBalanceRecord[], preparedDate: string) => void;
   onCancel: () => void;
 }
+
+const FIELD_LABELS: Record<keyof Omit<ColumnMapping, 'name2' | 'status'>, string> = {
+  account: 'Account Number',
+  name: 'Customer Name',
+  address: 'Address',
+  balance: 'Balance',
+  scheme_type: 'Scheme/Product',
+  bo_name: 'BO/Branch Name'
+};
 
 export const BalancePreviewDialog = ({
   open,
   onOpenChange,
-  records,
-  preparedDate,
+  rawData,
   fileName,
   onConfirm,
   onCancel
 }: BalancePreviewDialogProps) => {
+  const [showMapping, setShowMapping] = useState(false);
+  const [mapping, setMapping] = useState<ColumnMapping>(rawData.autoMapping);
+  
+  // Reset mapping when rawData changes
+  useEffect(() => {
+    setMapping(rawData.autoMapping);
+  }, [rawData]);
+  
+  // Apply mapping to get records
+  const records = useMemo(() => {
+    return applyColumnMapping(rawData, mapping);
+  }, [rawData, mapping]);
+  
   // Analyze detected columns based on actual data
   const analyzeDetectedColumns = (): ColumnDetection => {
     const sample = records.slice(0, 10);
@@ -53,8 +76,11 @@ export const BalancePreviewDialog = ({
   // Count issues
   const recordsWithBalance = records.filter(r => r.balance > 0).length;
   const recordsWithScheme = records.filter(r => r.scheme_type && r.scheme_type.trim()).length;
-  const balancePercentage = Math.round((recordsWithBalance / records.length) * 100);
-  const schemePercentage = Math.round((recordsWithScheme / records.length) * 100);
+  const balancePercentage = records.length > 0 ? Math.round((recordsWithBalance / records.length) * 100) : 0;
+  const schemePercentage = records.length > 0 ? Math.round((recordsWithScheme / records.length) * 100) : 0;
+  
+  // Check if auto-detection might have failed
+  const hasDetectionIssues = !detection.balance || !detection.scheme_type || !detection.bo_name;
 
   const DetectionBadge = ({ detected, label }: { detected: boolean; label: string }) => (
     <Badge 
@@ -65,10 +91,25 @@ export const BalancePreviewDialog = ({
       {label}
     </Badge>
   );
+  
+  const handleMappingChange = (field: keyof ColumnMapping, value: string) => {
+    setMapping(prev => ({
+      ...prev,
+      [field]: value === 'none' ? null : parseInt(value)
+    }));
+  };
+  
+  const handleResetMapping = () => {
+    setMapping(rawData.autoMapping);
+  };
+  
+  const handleConfirm = () => {
+    onConfirm(records, rawData.preparedDate);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5 text-primary" />
@@ -81,28 +122,39 @@ export const BalancePreviewDialog = ({
 
         <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
           {/* File Info */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
               <span className="text-muted-foreground">File:</span>
-              <span className="ml-2 font-medium">{fileName}</span>
+              <span className="ml-2 font-medium truncate block" title={fileName}>{fileName}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Balance Date:</span>
-              <span className="ml-2 font-medium">{preparedDate}</span>
+              <span className="ml-2 font-medium">{rawData.preparedDate}</span>
             </div>
             <div>
               <span className="text-muted-foreground">Total Records:</span>
               <span className="ml-2 font-medium">{records.length.toLocaleString()}</span>
             </div>
             <div>
-              <span className="text-muted-foreground">Preview:</span>
-              <span className="ml-2 font-medium">First 10 records</span>
+              <span className="text-muted-foreground">CSV Columns:</span>
+              <span className="ml-2 font-medium">{rawData.headers.length}</span>
             </div>
           </div>
 
           {/* Detected Columns */}
           <div className="space-y-2">
-            <h4 className="text-sm font-medium">Detected Columns:</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium">Detected Columns:</h4>
+              <Button
+                variant={showMapping ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowMapping(!showMapping)}
+                className="gap-1"
+              >
+                <Settings2 className="h-4 w-4" />
+                {showMapping ? 'Hide Mapping' : 'Manual Mapping'}
+              </Button>
+            </div>
             <div className="flex flex-wrap gap-2">
               <DetectionBadge detected={detection.account} label="Account No" />
               <DetectionBadge detected={detection.name} label="Name" />
@@ -112,9 +164,106 @@ export const BalancePreviewDialog = ({
               <DetectionBadge detected={detection.bo_name} label="BO Name" />
             </div>
           </div>
+          
+          {/* Manual Column Mapping */}
+          {showMapping && (
+            <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium">Manual Column Mapping</h4>
+                <Button variant="ghost" size="sm" onClick={handleResetMapping} className="gap-1">
+                  <RotateCcw className="h-3 w-3" />
+                  Reset to Auto
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Select which CSV column corresponds to each field. Choose "Not Mapped" if the column doesn't exist.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {(Object.entries(FIELD_LABELS) as [keyof typeof FIELD_LABELS, string][]).map(([field, label]) => (
+                  <div key={field} className="space-y-1.5">
+                    <Label className="text-xs">{label}</Label>
+                    <Select
+                      value={mapping[field]?.toString() ?? 'none'}
+                      onValueChange={(value) => handleMappingChange(field, value)}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Select column" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border max-h-[200px]">
+                        <SelectItem value="none" className="text-muted-foreground">
+                          Not Mapped
+                        </SelectItem>
+                        {rawData.headers.map((header, idx) => (
+                          <SelectItem key={idx} value={idx.toString()}>
+                            {idx}: {header || `Column ${idx + 1}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+                {/* Additional fields for name2 and status */}
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Name 2 (Optional)</Label>
+                  <Select
+                    value={mapping.name2?.toString() ?? 'none'}
+                    onValueChange={(value) => handleMappingChange('name2', value)}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select column" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border max-h-[200px]">
+                      <SelectItem value="none" className="text-muted-foreground">
+                        Not Mapped
+                      </SelectItem>
+                      {rawData.headers.map((header, idx) => (
+                        <SelectItem key={idx} value={idx.toString()}>
+                          {idx}: {header || `Column ${idx + 1}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Account Status (Optional)</Label>
+                  <Select
+                    value={mapping.status?.toString() ?? 'none'}
+                    onValueChange={(value) => handleMappingChange('status', value)}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="Select column" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-background border max-h-[200px]">
+                      <SelectItem value="none" className="text-muted-foreground">
+                        Not Mapped
+                      </SelectItem>
+                      {rawData.headers.map((header, idx) => (
+                        <SelectItem key={idx} value={idx.toString()}>
+                          {idx}: {header || `Column ${idx + 1}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Detection Issues Warning */}
+          {hasDetectionIssues && !showMapping && (
+            <div className="flex items-start gap-2 p-3 rounded-md bg-orange-500/10 border border-orange-500/20">
+              <Settings2 className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-orange-600 dark:text-orange-400">Column Detection Issue</p>
+                <p className="mt-1 text-muted-foreground">
+                  Some columns couldn't be auto-detected. Click "Manual Mapping" above to map columns manually.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Data Quality Warnings */}
-          {(balancePercentage < 80 || schemePercentage < 50) && (
+          {(balancePercentage < 80 || schemePercentage < 50) && records.length > 0 && (
             <div className="flex items-start gap-2 p-3 rounded-md bg-yellow-500/10 border border-yellow-500/20">
               <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0 mt-0.5" />
               <div className="text-sm">
@@ -133,7 +282,7 @@ export const BalancePreviewDialog = ({
 
           {/* Preview Table */}
           <div className="border rounded-md flex-1 overflow-hidden">
-            <ScrollArea className="h-[300px]">
+            <ScrollArea className="h-[280px]">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -146,30 +295,38 @@ export const BalancePreviewDialog = ({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {previewRecords.map((record, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="font-mono text-xs">{record.account}</TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]" title={record.name}>
-                        {record.name || <span className="text-muted-foreground">-</span>}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[150px]" title={record.address}>
-                        {record.address || <span className="text-muted-foreground">-</span>}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-xs">
-                        {record.balance > 0 ? (
-                          `₹${record.balance.toLocaleString()}`
-                        ) : (
-                          <span className="text-destructive">₹0</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[120px]" title={record.scheme_type}>
-                        {record.scheme_type || <span className="text-muted-foreground">-</span>}
-                      </TableCell>
-                      <TableCell className="text-xs truncate max-w-[100px]" title={record.bo_name}>
-                        {record.bo_name || <span className="text-muted-foreground">-</span>}
+                  {previewRecords.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                        No valid records found. Try adjusting the column mapping.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    previewRecords.map((record, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-mono text-xs">{record.account}</TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px]" title={record.name}>
+                          {record.name || <span className="text-muted-foreground">-</span>}
+                        </TableCell>
+                        <TableCell className="text-xs truncate max-w-[150px]" title={record.address}>
+                          {record.address || <span className="text-muted-foreground">-</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-xs">
+                          {record.balance > 0 ? (
+                            `₹${record.balance.toLocaleString()}`
+                          ) : (
+                            <span className="text-destructive">₹0</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs truncate max-w-[120px]" title={record.scheme_type}>
+                          {record.scheme_type || <span className="text-muted-foreground">-</span>}
+                        </TableCell>
+                        <TableCell className="text-xs truncate max-w-[100px]" title={record.bo_name}>
+                          {record.bo_name || <span className="text-muted-foreground">-</span>}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </ScrollArea>
@@ -186,7 +343,7 @@ export const BalancePreviewDialog = ({
           <Button variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={onConfirm}>
+          <Button onClick={handleConfirm} disabled={records.length === 0}>
             Save {records.length.toLocaleString()} Records
           </Button>
         </DialogFooter>
