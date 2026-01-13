@@ -8,8 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { LastBalanceRecord, ColumnMapping, RawCSVData, applyColumnMapping } from '@/lib/fileParser';
-import { ColumnMappingPreset, getPresets, savePreset, deletePreset } from '@/lib/columnPresets';
-import { CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet, Settings2, RotateCcw, Save, Trash2, FolderOpen } from 'lucide-react';
+import { ColumnMappingPreset, PresetMatch, getPresets, savePreset, deletePreset, findMatchingPresets } from '@/lib/columnPresets';
+import { CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet, Settings2, RotateCcw, Save, Trash2, FolderOpen, Sparkles, Zap } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
 interface ColumnDetection {
@@ -52,16 +52,39 @@ export const BalancePreviewDialog = ({
   const [presets, setPresets] = useState<ColumnMappingPreset[]>([]);
   const [newPresetName, setNewPresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
+  const [suggestedPresets, setSuggestedPresets] = useState<PresetMatch[]>([]);
+  const [appliedPresetId, setAppliedPresetId] = useState<string | null>(null);
   
   // Load presets on mount
   useEffect(() => {
     setPresets(getPresets());
   }, []);
   
+  // Find matching presets when rawData changes
+  useEffect(() => {
+    if (rawData.headers.length > 0) {
+      const matches = findMatchingPresets(rawData.headers, 50);
+      setSuggestedPresets(matches);
+      
+      // Auto-apply best match if score is very high (>85%)
+      const bestMatch = matches.find(m => m.score >= 85);
+      if (bestMatch && !appliedPresetId) {
+        setMapping(bestMatch.preset.mapping);
+        setAppliedPresetId(bestMatch.preset.id);
+        toast({
+          title: 'Preset auto-applied',
+          description: `"${bestMatch.preset.name}" matched with ${bestMatch.score}% confidence`
+        });
+      }
+    }
+  }, [rawData.headers]);
+  
   // Reset mapping when rawData changes
   useEffect(() => {
-    setMapping(rawData.autoMapping);
-  }, [rawData]);
+    if (!appliedPresetId) {
+      setMapping(rawData.autoMapping);
+    }
+  }, [rawData, appliedPresetId]);
   
   // Apply mapping to get records
   const records = useMemo(() => {
@@ -108,10 +131,12 @@ export const BalancePreviewDialog = ({
       ...prev,
       [field]: value === 'none' ? null : parseInt(value)
     }));
+    setAppliedPresetId(null); // Clear applied preset when manually changing
   };
   
   const handleResetMapping = () => {
     setMapping(rawData.autoMapping);
+    setAppliedPresetId(null);
   };
   
   const handleSavePreset = () => {
@@ -124,14 +149,14 @@ export const BalancePreviewDialog = ({
       return;
     }
     
-    const preset = savePreset(newPresetName, mapping);
+    const preset = savePreset(newPresetName, mapping, rawData.headers);
     setPresets(getPresets());
     setNewPresetName('');
     setShowSavePreset(false);
     
     toast({
       title: 'Preset saved',
-      description: `"${preset.name}" has been saved for future use`
+      description: `"${preset.name}" has been saved and will auto-detect similar CSV formats`
     });
   };
   
@@ -139,6 +164,7 @@ export const BalancePreviewDialog = ({
     const preset = presets.find(p => p.id === presetId);
     if (preset) {
       setMapping(preset.mapping);
+      setAppliedPresetId(preset.id);
       toast({
         title: 'Preset loaded',
         description: `Applied mapping from "${preset.name}"`
@@ -146,9 +172,22 @@ export const BalancePreviewDialog = ({
     }
   };
   
+  const handleApplySuggestedPreset = (match: PresetMatch) => {
+    setMapping(match.preset.mapping);
+    setAppliedPresetId(match.preset.id);
+    toast({
+      title: 'Preset applied',
+      description: `"${match.preset.name}" (${match.score}% match)`
+    });
+  };
+  
   const handleDeletePreset = (presetId: string, presetName: string) => {
     deletePreset(presetId);
     setPresets(getPresets());
+    setSuggestedPresets(prev => prev.filter(m => m.preset.id !== presetId));
+    if (appliedPresetId === presetId) {
+      setAppliedPresetId(null);
+    }
     toast({
       title: 'Preset deleted',
       description: `"${presetName}" has been removed`
@@ -173,6 +212,54 @@ export const BalancePreviewDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+          {/* Suggested Presets Banner */}
+          {suggestedPresets.length > 0 && !appliedPresetId && (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/20">
+              <Sparkles className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-primary">Matching presets found!</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  This CSV format matches saved presets. Click to apply:
+                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {suggestedPresets.slice(0, 3).map((match) => (
+                    <Button
+                      key={match.preset.id}
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1.5 border-primary/30 hover:bg-primary/10"
+                      onClick={() => handleApplySuggestedPreset(match)}
+                    >
+                      <Zap className="h-3 w-3" />
+                      {match.preset.name}
+                      <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
+                        {match.score}%
+                      </Badge>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Applied Preset Indicator */}
+          {appliedPresetId && (
+            <div className="flex items-center gap-2 p-2 rounded-md bg-green-500/10 border border-green-500/20">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-700 dark:text-green-400">
+                Using preset: <strong>{presets.find(p => p.id === appliedPresetId)?.name || suggestedPresets.find(m => m.preset.id === appliedPresetId)?.preset.name}</strong>
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-xs ml-auto"
+                onClick={handleResetMapping}
+              >
+                Use Auto-detect
+              </Button>
+            </div>
+          )}
+
           {/* File Info */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
