@@ -6,8 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { LastBalanceRecord, ColumnMapping, RawCSVData, applyColumnMapping } from '@/lib/fileParser';
-import { CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet, Settings2, RotateCcw } from 'lucide-react';
+import { ColumnMappingPreset, getPresets, savePreset, deletePreset } from '@/lib/columnPresets';
+import { CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet, Settings2, RotateCcw, Save, Trash2, FolderOpen } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface ColumnDetection {
   account: boolean;
@@ -46,6 +49,14 @@ export const BalancePreviewDialog = ({
 }: BalancePreviewDialogProps) => {
   const [showMapping, setShowMapping] = useState(false);
   const [mapping, setMapping] = useState<ColumnMapping>(rawData.autoMapping);
+  const [presets, setPresets] = useState<ColumnMappingPreset[]>([]);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [showSavePreset, setShowSavePreset] = useState(false);
+  
+  // Load presets on mount
+  useEffect(() => {
+    setPresets(getPresets());
+  }, []);
   
   // Reset mapping when rawData changes
   useEffect(() => {
@@ -101,6 +112,47 @@ export const BalancePreviewDialog = ({
   
   const handleResetMapping = () => {
     setMapping(rawData.autoMapping);
+  };
+  
+  const handleSavePreset = () => {
+    if (!newPresetName.trim()) {
+      toast({
+        title: 'Name required',
+        description: 'Please enter a name for the preset',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const preset = savePreset(newPresetName, mapping);
+    setPresets(getPresets());
+    setNewPresetName('');
+    setShowSavePreset(false);
+    
+    toast({
+      title: 'Preset saved',
+      description: `"${preset.name}" has been saved for future use`
+    });
+  };
+  
+  const handleLoadPreset = (presetId: string) => {
+    const preset = presets.find(p => p.id === presetId);
+    if (preset) {
+      setMapping(preset.mapping);
+      toast({
+        title: 'Preset loaded',
+        description: `Applied mapping from "${preset.name}"`
+      });
+    }
+  };
+  
+  const handleDeletePreset = (presetId: string, presetName: string) => {
+    deletePreset(presetId);
+    setPresets(getPresets());
+    toast({
+      title: 'Preset deleted',
+      description: `"${presetName}" has been removed`
+    });
   };
   
   const handleConfirm = () => {
@@ -168,12 +220,88 @@ export const BalancePreviewDialog = ({
           {/* Manual Column Mapping */}
           {showMapping && (
             <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <h4 className="text-sm font-medium">Manual Column Mapping</h4>
-                <Button variant="ghost" size="sm" onClick={handleResetMapping} className="gap-1">
-                  <RotateCcw className="h-3 w-3" />
-                  Reset to Auto
-                </Button>
+                <div className="flex items-center gap-2">
+                  {/* Preset Selector */}
+                  {presets.length > 0 && (
+                    <Select onValueChange={handleLoadPreset}>
+                      <SelectTrigger className="h-8 w-[160px] text-xs">
+                        <FolderOpen className="h-3 w-3 mr-1" />
+                        <SelectValue placeholder="Load Preset" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-background border">
+                        {presets.map(preset => (
+                          <div key={preset.id} className="flex items-center justify-between px-2 py-1 hover:bg-muted group">
+                            <SelectItem value={preset.id} className="flex-1 p-0">
+                              {preset.name}
+                            </SelectItem>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeletePreset(preset.id, preset.name);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
+                          </div>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  
+                  {/* Save Preset */}
+                  {showSavePreset ? (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        placeholder="Preset name"
+                        value={newPresetName}
+                        onChange={(e) => setNewPresetName(e.target.value)}
+                        className="h-8 w-[140px] text-xs"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSavePreset();
+                          if (e.key === 'Escape') {
+                            setShowSavePreset(false);
+                            setNewPresetName('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <Button variant="default" size="sm" className="h-8" onClick={handleSavePreset}>
+                        Save
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8" 
+                        onClick={() => {
+                          setShowSavePreset(false);
+                          setNewPresetName('');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="h-8 gap-1" 
+                      onClick={() => setShowSavePreset(true)}
+                    >
+                      <Save className="h-3 w-3" />
+                      Save Preset
+                    </Button>
+                  )}
+                  
+                  <Button variant="ghost" size="sm" onClick={handleResetMapping} className="h-8 gap-1">
+                    <RotateCcw className="h-3 w-3" />
+                    Reset
+                  </Button>
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 Select which CSV column corresponds to each field. Choose "Not Mapped" if the column doesn't exist.
