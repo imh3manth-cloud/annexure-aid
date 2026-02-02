@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { db, MemoRecord, DespatchRecord, saveDespatchRecord, getAllDespatchRecords, getDaysSinceLastDespatch } from '@/lib/db';
+import { db, MemoRecord, saveDespatchRecord, getAllDespatchRecords, getDaysSinceLastDespatch, DespatchRecord } from '@/lib/db';
 import { Send, Bell, Calendar, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -43,9 +43,8 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
 
   const fetchPendingMemos = async () => {
     // Get printed memos without despatch details (printed=true, no post_number in remarks)
-    const printedMemos = await db.memos
-      .filter(m => m.printed === true && !m.remarks?.includes('Post No:'))
-      .toArray();
+    const allMemos = await db.memos.toArray();
+    const printedMemos = allMemos.filter(m => m.printed === true && !m.remarks?.includes('Post No:'));
     setPendingMemos(printedMemos);
     
     // Auto-fill from/to if there are pending memos
@@ -84,17 +83,15 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
 
     try {
       // Find memos in the range
-      const memosInRange = await db.memos
-        .where('serial')
-        .between(fromSerial, toSerial, true, true)
-        .toArray();
+      const allMemos = await db.memos.toArray();
+      const memosInRange = allMemos.filter(m => m.serial >= fromSerial && m.serial <= toSerial);
 
       if (memosInRange.length === 0) {
         toast({ title: 'No memos found in this range', variant: 'destructive' });
         return;
       }
 
-      // Update each memo with despatch details
+      // Update each memo with despatch details - use despatch date as memo_sent_date
       for (const memo of memosInRange) {
         const despatchInfo = `Post No: ${postNumber}, Despatch: ${despatchDate}`;
         const newRemarks = memo.remarks 
@@ -102,7 +99,7 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
           : despatchInfo;
 
         await db.memos.update(memo.id!, {
-          memo_sent_date: despatchDate,
+          memo_sent_date: despatchDate, // Use despatch date as memo sent date
           remarks: newRemarks
         });
       }
