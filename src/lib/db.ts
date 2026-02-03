@@ -284,9 +284,9 @@ const getMemosByIds = async (ids: (string | number)[]): Promise<MemoRecord[]> =>
   return (data || []).map(dbToMemo);
 };
 
-const updateMemo = async (id: string | number, updates: Partial<MemoRecord>) => {
+const updateMemo = async (id: string | number, updates: Partial<MemoRecord>): Promise<boolean> => {
   const userId = await getUserId();
-  if (!userId) return;
+  if (!userId) return false;
   
   // Convert field names
   const dbUpdates: any = {};
@@ -303,10 +303,17 @@ const updateMemo = async (id: string | number, updates: Partial<MemoRecord>) => 
   if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
   if (updates.balance_date !== undefined) dbUpdates.balance_date = updates.balance_date || null;
   
-  await supabase
+  const { error } = await supabase
     .from('memos')
     .update(dbUpdates)
-    .eq('id', String(id));
+    .eq('id', String(id))
+    .eq('user_id', userId);
+  
+  if (error) {
+    console.error('Failed to update memo:', error);
+    return false;
+  }
+  return true;
 };
 
 export const clearAllMemos = async (): Promise<number> => {

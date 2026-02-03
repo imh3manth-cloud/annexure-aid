@@ -82,18 +82,28 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
     }
 
     try {
-      // Find memos in the range
+      // Find memos in the range that DON'T already have despatch details
       const allMemos = await db.memos.toArray();
-      const memosInRange = allMemos.filter(m => m.serial >= fromSerial && m.serial <= toSerial);
+      const memosInRange = allMemos.filter(m => 
+        m.serial >= fromSerial && 
+        m.serial <= toSerial && 
+        !m.remarks?.includes('Post No:') // Only memos without despatch info
+      );
 
       if (memosInRange.length === 0) {
-        toast({ title: 'No memos found in this range', variant: 'destructive' });
+        // Check if there are memos in range but all have despatch already
+        const allInRange = allMemos.filter(m => m.serial >= fromSerial && m.serial <= toSerial);
+        if (allInRange.length > 0) {
+          toast({ title: 'All memos in this range already have despatch details', variant: 'destructive' });
+        } else {
+          toast({ title: 'No memos found in this range', variant: 'destructive' });
+        }
         return;
       }
 
       // Update each memo with despatch details - use despatch date as memo_sent_date
+      const despatchInfo = `Post No: ${postNumber}, Despatch: ${despatchDate}`;
       for (const memo of memosInRange) {
-        const despatchInfo = `Post No: ${postNumber}, Despatch: ${despatchDate}`;
         const newRemarks = memo.remarks 
           ? `${memo.remarks}; ${despatchInfo}`
           : despatchInfo;
