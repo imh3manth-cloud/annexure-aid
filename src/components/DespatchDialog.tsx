@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { db, MemoRecord, saveDespatchRecord, getAllDespatchRecords, getDaysSinceLastDespatch, DespatchRecord } from '@/lib/db';
-import { Send, Bell, Calendar, Clock } from 'lucide-react';
+import { Send, Bell, Calendar, Clock, Settings } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DespatchManager } from './DespatchManager';
 interface DespatchDialogProps {
   onDespatchSaved?: () => void;
 }
@@ -177,146 +178,174 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
             Enter Despatch Details
           </DialogTitle>
           <DialogDescription>
-            Record postal despatch details for printed memos
-          </DialogDescription>
-        </DialogHeader>
+          Record postal despatch details for printed memos
+        </DialogDescription>
+      </DialogHeader>
 
-        {/* Days since last despatch */}
-        {daysSinceLastDespatch !== null && (
-          <div className="flex items-center gap-2 p-3 bg-muted/50 border rounded-lg">
-            <Clock className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm">
-              <span className="font-medium">{daysSinceLastDespatch}</span> day(s) since last despatch
-              {despatchHistory.length > 0 && (
-                <span className="text-muted-foreground ml-1">
-                  (Last: {formatDate(despatchHistory[0].despatch_date)})
-                </span>
-              )}
-            </span>
-          </div>
-        )}
-
-        {pendingMemos.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
-              <Bell className="w-4 h-4 text-warning animate-bounce" />
-              <span className="text-sm font-medium text-warning">
-                {pendingMemos.length} printed memo(s) awaiting despatch details
+      {/* Days since last despatch */}
+      {daysSinceLastDespatch !== null && (
+        <div className="flex items-center gap-2 p-3 bg-muted/50 border rounded-lg">
+          <Clock className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm">
+            <span className="font-medium">{daysSinceLastDespatch}</span> day(s) since last despatch
+            {despatchHistory.length > 0 && (
+              <span className="text-muted-foreground ml-1">
+                (Last: {formatDate(despatchHistory[0].despatch_date)})
               </span>
-            </div>
-            
-            <ScrollArea className="h-32 border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-20">Serial</TableHead>
-                    <TableHead>Account</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Printed Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pendingMemos.map((memo) => (
-                    <TableRow key={memo.id}>
-                      <TableCell className="font-medium">{memo.serial}</TableCell>
-                      <TableCell>{memo.account}</TableCell>
-                      <TableCell>{memo.name}</TableCell>
-                      <TableCell>{memo.memo_sent_date || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </div>
-        )}
+            )}
+          </span>
+        </div>
+      )}
 
-        <div className="space-y-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
+      <Tabs defaultValue="new" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="new" className="flex items-center gap-2">
+            <Send className="w-4 h-4" />
+            New Despatch
+            {pendingMemos.length > 0 && (
+              <Badge variant="destructive" className="h-5 px-1.5 text-xs">
+                {pendingMemos.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="manage" className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Manage Existing
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="new" className="space-y-4 mt-4">
+          {pendingMemos.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 p-3 bg-warning/10 border border-warning/20 rounded-lg">
+                <Bell className="w-4 h-4 text-warning animate-bounce" />
+                <span className="text-sm font-medium text-warning">
+                  {pendingMemos.length} printed memo(s) awaiting despatch details
+                </span>
+              </div>
+              
+              <ScrollArea className="h-32 border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-20">Serial</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Printed Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingMemos.map((memo) => (
+                      <TableRow key={memo.id}>
+                        <TableCell className="font-medium">{memo.serial}</TableCell>
+                        <TableCell>{memo.account}</TableCell>
+                        <TableCell>{memo.name}</TableCell>
+                        <TableCell>{memo.memo_sent_date || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fromMemo">From Memo No.</Label>
+                <Input
+                  id="fromMemo"
+                  type="number"
+                  placeholder="e.g., 1"
+                  value={fromMemo}
+                  onChange={(e) => setFromMemo(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="toMemo">To Memo No.</Label>
+                <Input
+                  id="toMemo"
+                  type="number"
+                  placeholder="e.g., 10"
+                  value={toMemo}
+                  onChange={(e) => setToMemo(e.target.value)}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="fromMemo">From Memo No.</Label>
+              <Label htmlFor="postNumber">Post Number / Article No.</Label>
               <Input
-                id="fromMemo"
-                type="number"
-                placeholder="e.g., 1"
-                value={fromMemo}
-                onChange={(e) => setFromMemo(e.target.value)}
+                id="postNumber"
+                placeholder="e.g., RG123456789IN"
+                value={postNumber}
+                onChange={(e) => setPostNumber(e.target.value)}
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="toMemo">To Memo No.</Label>
+              <Label htmlFor="despatchDate">Date of Despatch</Label>
               <Input
-                id="toMemo"
-                type="number"
-                placeholder="e.g., 10"
-                value={toMemo}
-                onChange={(e) => setToMemo(e.target.value)}
+                id="despatchDate"
+                type="date"
+                value={despatchDate}
+                onChange={(e) => setDespatchDate(e.target.value)}
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="postNumber">Post Number / Article No.</Label>
-            <Input
-              id="postNumber"
-              placeholder="e.g., RG123456789IN"
-              value={postNumber}
-              onChange={(e) => setPostNumber(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="despatchDate">Date of Despatch</Label>
-            <Input
-              id="despatchDate"
-              type="date"
-              value={despatchDate}
-              onChange={(e) => setDespatchDate(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Despatch History */}
-        {despatchHistory.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              Recent Despatch History
-            </h4>
-            <ScrollArea className="h-32 border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>From-To</TableHead>
-                    <TableHead>Post No.</TableHead>
-                    <TableHead>Despatch Date</TableHead>
-                    <TableHead className="text-right">Memos</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {despatchHistory.slice(0, 10).map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell className="font-medium">{record.from_memo} - {record.to_memo}</TableCell>
-                      <TableCell>{record.post_number}</TableCell>
-                      <TableCell>{formatDate(record.despatch_date)}</TableCell>
-                      <TableCell className="text-right">{record.memo_count}</TableCell>
+          {/* Despatch History */}
+          {despatchHistory.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Recent Despatch History
+              </h4>
+              <ScrollArea className="h-32 border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>From-To</TableHead>
+                      <TableHead>Post No.</TableHead>
+                      <TableHead>Despatch Date</TableHead>
+                      <TableHead className="text-right">Memos</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          </div>
-        )}
+                  </TableHeader>
+                  <TableBody>
+                    {despatchHistory.slice(0, 10).map((record) => (
+                      <TableRow key={record.id}>
+                        <TableCell className="font-medium">{record.from_memo} - {record.to_memo}</TableCell>
+                        <TableCell>{record.post_number}</TableCell>
+                        <TableCell>{formatDate(record.despatch_date)}</TableCell>
+                        <TableCell className="text-right">{record.memo_count}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+            </div>
+          )}
 
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave} disabled={pendingMemos.length === 0 && !fromMemo}>
-            <Send className="w-4 h-4 mr-2" />
-            Save Details
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={pendingMemos.length === 0 && !fromMemo}>
+              <Send className="w-4 h-4 mr-2" />
+              Save Details
+            </Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="manage" className="mt-4">
+          <DespatchManager onUpdate={() => {
+            fetchPendingMemos();
+            fetchDespatchHistory();
+            onDespatchSaved?.();
+          }} />
+        </TabsContent>
+      </Tabs>
+    </DialogContent>
+  </Dialog>
+);
 };
