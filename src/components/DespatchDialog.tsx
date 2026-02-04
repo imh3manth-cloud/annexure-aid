@@ -5,12 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { db, MemoRecord, saveDespatchRecord, getAllDespatchRecords, getDaysSinceLastDespatch, DespatchRecord } from '@/lib/db';
-import { Send, Bell, Calendar, Clock, Settings } from 'lucide-react';
+import { Send, Bell, Calendar, Clock, Settings, CalendarCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DespatchManager } from './DespatchManager';
+import { ManualSentDateUpdater } from './ManualSentDateUpdater';
+
 interface DespatchDialogProps {
   onDespatchSaved?: () => void;
 }
@@ -198,7 +200,7 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
       )}
 
       <Tabs defaultValue="new" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="new" className="flex items-center gap-2">
             <Send className="w-4 h-4" />
             New Despatch
@@ -208,9 +210,13 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="manual" className="flex items-center gap-2">
+            <CalendarCheck className="w-4 h-4" />
+            Mark as Sent
+          </TabsTrigger>
           <TabsTrigger value="manage" className="flex items-center gap-2">
             <Settings className="w-4 h-4" />
-            Manage Existing
+            Manage
           </TabsTrigger>
         </TabsList>
 
@@ -335,6 +341,14 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
               Save Details
             </Button>
           </div>
+        </TabsContent>
+
+        <TabsContent value="manual" className="mt-4">
+          <ManualSentDateUpdater onUpdate={() => {
+            fetchPendingMemos();
+            fetchDespatchHistory();
+            onDespatchSaved?.();
+          }} />
         </TabsContent>
 
         <TabsContent value="manage" className="mt-4">
