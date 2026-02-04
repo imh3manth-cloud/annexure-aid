@@ -4,12 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { db, MemoRecord } from '@/lib/db';
-import { CalendarCheck, Check, AlertCircle } from 'lucide-react';
+import { CalendarCheck, Check, AlertCircle, Filter } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface ManualSentDateUpdaterProps {
   onUpdate?: () => void;
@@ -17,9 +18,13 @@ interface ManualSentDateUpdaterProps {
 
 export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) => {
   const [printedMemos, setPrintedMemos] = useState<MemoRecord[]>([]);
+  const [allPrintedMemos, setAllPrintedMemos] = useState<MemoRecord[]>([]);
   const [selected, setSelected] = useState<Set<string | number>>(new Set());
   const [sentDate, setSentDate] = useState(new Date().toISOString().split('T')[0]);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [fromMemo, setFromMemo] = useState('');
+  const [toMemo, setToMemo] = useState('');
+  const [rangeMode, setRangeMode] = useState<'select' | 'range'>('select');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -28,13 +33,17 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
 
   const fetchPrintedMemos = async () => {
     const allMemos = await db.memos.toArray();
-    // Get printed memos that don't have a memo_sent_date yet (not pending)
+    // Get printed memos that don't have a memo_sent_date yet (status still New)
     const printed = allMemos.filter(m => 
       m.printed === true && 
       !m.memo_sent_date &&
       m.status === 'New'
     );
     setPrintedMemos(printed.sort((a, b) => a.serial - b.serial));
+    
+    // Also keep ALL printed memos for range selection (regardless of status)
+    const allPrinted = allMemos.filter(m => m.printed === true);
+    setAllPrintedMemos(allPrinted.sort((a, b) => a.serial - b.serial));
   };
 
   const toggleSelect = (id: string | number) => {
@@ -103,6 +112,76 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
     }
   };
 
+  const handleRangeUpdate = async () => {
+    if (!fromMemo || !toMemo) {
+      toast({ title: 'Please enter both From and To memo numbers', variant: 'destructive' });
+      return;
+    }
+
+    if (!sentDate) {
+      toast({ title: 'Please enter a sent date', variant: 'destructive' });
+      return;
+    }
+
+    const fromSerial = parseInt(fromMemo);
+    const toSerial = parseInt(toMemo);
+
+    if (isNaN(fromSerial) || isNaN(toSerial)) {
+      toast({ title: 'Invalid memo numbers', variant: 'destructive' });
+      return;
+    }
+
+    if (fromSerial > toSerial) {
+      toast({ title: 'From memo should be less than or equal to To memo', variant: 'destructive' });
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      // Find ALL printed memos in the range (regardless of current status)
+      const memosInRange = allPrintedMemos.filter(m => 
+        m.serial >= fromSerial && 
+        m.serial <= toSerial &&
+        m.printed === true
+      );
+
+      if (memosInRange.length === 0) {
+        toast({ title: 'No printed memos found in this range', variant: 'destructive' });
+        setIsUpdating(false);
+        return;
+      }
+
+      let successCount = 0;
+      for (const memo of memosInRange) {
+        const sentInfo = `Sent: ${sentDate}`;
+        const newRemarks = memo.remarks 
+          ? `${memo.remarks}; ${sentInfo}`
+          : sentInfo;
+
+        await db.memos.update(memo.id!, {
+          memo_sent_date: sentDate,
+          status: 'Pending',
+          remarks: newRemarks
+        });
+        successCount++;
+      }
+
+      toast({ 
+        title: 'Memos updated successfully', 
+        description: `Updated ${successCount} memo(s) from serial ${fromSerial} to ${toSerial}` 
+      });
+      
+      setFromMemo('');
+      setToMemo('');
+      await fetchPrintedMemos();
+      onUpdate?.();
+    } catch (error: any) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
     return new Date(dateStr).toLocaleDateString('en-IN', {
@@ -111,16 +190,6 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
       year: 'numeric'
     });
   };
-
-  if (printedMemos.length === 0) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        <CalendarCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
-        <p>No printed memos awaiting sent date</p>
-        <p className="text-sm mt-1">All printed memos have already been marked as sent</p>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">
@@ -132,74 +201,165 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
         </AlertDescription>
       </Alert>
 
-      <div className="flex items-end gap-4">
-        <div className="flex-1 space-y-2">
-          <Label htmlFor="sentDate">Sent Date (Memo Sent Date)</Label>
-          <Input
-            id="sentDate"
-            type="date"
-            value={sentDate}
-            onChange={(e) => setSentDate(e.target.value)}
-          />
-        </div>
-        
-        <Button 
-          onClick={handleUpdateSentDate} 
-          disabled={selected.size === 0 || isUpdating}
-          className="gap-2"
-        >
-          <Check className="w-4 h-4" />
-          Update {selected.size > 0 ? `(${selected.size})` : ''} as Sent
-        </Button>
-      </div>
+      <Tabs value={rangeMode} onValueChange={(v) => setRangeMode(v as 'select' | 'range')}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="select" className="flex items-center gap-2">
+            <Check className="w-4 h-4" />
+            Select Memos
+            {printedMemos.length > 0 && (
+              <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                {printedMemos.length}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="range" className="flex items-center gap-2">
+            <Filter className="w-4 h-4" />
+            By Range
+          </TabsTrigger>
+        </TabsList>
 
-      <ScrollArea className="h-64 border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-10">
-                <Checkbox
-                  checked={selected.size === printedMemos.length && printedMemos.length > 0}
-                  onCheckedChange={toggleSelectAll}
-                />
-              </TableHead>
-              <TableHead className="w-20">Serial</TableHead>
-              <TableHead>Account</TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Txn Date</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {printedMemos.map((memo) => (
-              <TableRow key={memo.id}>
-                <TableCell>
-                  <Checkbox
-                    checked={selected.has(memo.id!)}
-                    onCheckedChange={() => toggleSelect(memo.id!)}
+        <TabsContent value="select" className="space-y-4 mt-4">
+          {printedMemos.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <CalendarCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p>No printed memos awaiting sent date</p>
+              <p className="text-sm mt-1">All printed memos have already been marked as sent or use "By Range" to update any memo</p>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-end gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="sentDate">Sent Date (Memo Sent Date)</Label>
+                  <Input
+                    id="sentDate"
+                    type="date"
+                    value={sentDate}
+                    onChange={(e) => setSentDate(e.target.value)}
                   />
-                </TableCell>
-                <TableCell className="font-medium">{memo.serial}</TableCell>
-                <TableCell>{memo.account}</TableCell>
-                <TableCell className="max-w-32 truncate">{memo.name}</TableCell>
-                <TableCell>₹{memo.amount.toLocaleString()}</TableCell>
-                <TableCell>{formatDate(memo.txn_date)}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">
-                    {memo.status}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </ScrollArea>
+                </div>
+                
+                <Button 
+                  onClick={handleUpdateSentDate} 
+                  disabled={selected.size === 0 || isUpdating}
+                  className="gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  Update {selected.size > 0 ? `(${selected.size})` : ''} as Sent
+                </Button>
+              </div>
 
-      <p className="text-xs text-muted-foreground">
-        {printedMemos.length} printed memo(s) awaiting sent date • 
-        {selected.size > 0 && ` ${selected.size} selected`}
-      </p>
+              <ScrollArea className="h-64 border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={selected.size === printedMemos.length && printedMemos.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                      </TableHead>
+                      <TableHead className="w-20">Serial</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Txn Date</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {printedMemos.map((memo) => (
+                      <TableRow key={memo.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selected.has(memo.id!)}
+                            onCheckedChange={() => toggleSelect(memo.id!)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">{memo.serial}</TableCell>
+                        <TableCell>{memo.account}</TableCell>
+                        <TableCell className="max-w-32 truncate">{memo.name}</TableCell>
+                        <TableCell>₹{memo.amount.toLocaleString()}</TableCell>
+                        <TableCell>{formatDate(memo.txn_date)}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {memo.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </ScrollArea>
+
+              <p className="text-xs text-muted-foreground">
+                {printedMemos.length} printed memo(s) awaiting sent date • 
+                {selected.size > 0 && ` ${selected.size} selected`}
+              </p>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="range" className="space-y-4 mt-4">
+          <Alert>
+            <Filter className="h-4 w-4" />
+            <AlertDescription>
+              Enter a range of memo serial numbers to update. This will mark all printed memos 
+              in the range as "Sent" regardless of their current status.
+            </AlertDescription>
+          </Alert>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="fromMemoRange">From Memo No.</Label>
+              <Input
+                id="fromMemoRange"
+                type="number"
+                placeholder="e.g., 1"
+                value={fromMemo}
+                onChange={(e) => setFromMemo(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="toMemoRange">To Memo No.</Label>
+              <Input
+                id="toMemoRange"
+                type="number"
+                placeholder="e.g., 50"
+                value={toMemo}
+                onChange={(e) => setToMemo(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="sentDateRange">Sent Date</Label>
+            <Input
+              id="sentDateRange"
+              type="date"
+              value={sentDate}
+              onChange={(e) => setSentDate(e.target.value)}
+            />
+          </div>
+
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleRangeUpdate} 
+              disabled={!fromMemo || !toMemo || isUpdating}
+              className="gap-2"
+            >
+              <Check className="w-4 h-4" />
+              Update Range as Sent
+            </Button>
+          </div>
+
+          {allPrintedMemos.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {allPrintedMemos.length} total printed memo(s) available • 
+              Serial range: {allPrintedMemos[0]?.serial} to {allPrintedMemos[allPrintedMemos.length - 1]?.serial}
+            </p>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
