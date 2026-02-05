@@ -42,9 +42,19 @@ export const Settings = () => {
   const loadConfig = () => {
     const saved = localStorage.getItem('appConfig');
     if (saved) {
-      const parsed = JSON.parse(saved);
-      setConfig(parsed);
-      setBoMappingsText(formatBOMappings(parsed.boMappings));
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          setConfig({ ...DEFAULT_CONFIG, ...parsed });
+          setBoMappingsText(formatBOMappings(parsed.boMappings || DEFAULT_CONFIG.boMappings));
+        } else {
+          setBoMappingsText(formatBOMappings(DEFAULT_CONFIG.boMappings));
+        }
+      } catch (e) {
+        console.error('Failed to parse saved config:', e);
+        localStorage.removeItem('appConfig');
+        setBoMappingsText(formatBOMappings(DEFAULT_CONFIG.boMappings));
+      }
     } else {
       setBoMappingsText(formatBOMappings(DEFAULT_CONFIG.boMappings));
     }
@@ -115,24 +125,48 @@ export const Settings = () => {
     input.onchange = async (e: any) => {
       try {
         const file = e.target.files[0];
+        if (!file) return;
+        
         const text = await file.text();
-        const backup = JSON.parse(text);
-
-        // Restore config
-        if (backup.config) {
-          localStorage.setItem('appConfig', JSON.stringify(backup.config));
-          setConfig(backup.config);
-          setBoMappingsText(formatBOMappings(backup.config.boMappings));
+        let backup: any;
+        
+        try {
+          backup = JSON.parse(text);
+        } catch (parseError) {
+          toast({ 
+            title: 'Restore failed', 
+            description: 'Invalid JSON file format', 
+            variant: 'destructive' 
+          });
+          return;
         }
 
-        // Restore memos
-        if (backup.memos) {
+        // Validate backup structure
+        if (!backup || typeof backup !== 'object') {
+          toast({ 
+            title: 'Restore failed', 
+            description: 'Invalid backup file format', 
+            variant: 'destructive' 
+          });
+          return;
+        }
+
+        // Restore config with validation
+        if (backup.config && typeof backup.config === 'object') {
+          const safeConfig = { ...DEFAULT_CONFIG, ...backup.config };
+          localStorage.setItem('appConfig', JSON.stringify(safeConfig));
+          setConfig(safeConfig);
+          setBoMappingsText(formatBOMappings(safeConfig.boMappings || DEFAULT_CONFIG.boMappings));
+        }
+
+        // Restore memos with validation
+        if (backup.memos && Array.isArray(backup.memos)) {
           await db.memos.clear();
           await db.memos.bulkAdd(backup.memos);
         }
 
-        // Restore settings
-        if (backup.settings) {
+        // Restore settings with validation
+        if (backup.settings && Array.isArray(backup.settings)) {
           await db.settings.clear();
           await db.settings.bulkAdd(backup.settings);
         }

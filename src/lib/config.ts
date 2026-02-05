@@ -23,7 +23,16 @@ const DEFAULT_CONFIG: AppConfig = {
 export const getConfig = (): AppConfig => {
   const saved = localStorage.getItem('appConfig');
   if (saved) {
-    return JSON.parse(saved);
+    try {
+      const parsed = JSON.parse(saved);
+      // Validate structure
+      if (parsed && typeof parsed === 'object') {
+        return { ...DEFAULT_CONFIG, ...parsed };
+      }
+    } catch (e) {
+      console.error('Failed to parse config:', e);
+      localStorage.removeItem('appConfig');
+    }
   }
   return DEFAULT_CONFIG;
 };
