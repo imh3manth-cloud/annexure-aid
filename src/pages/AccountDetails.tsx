@@ -1,31 +1,79 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { extractRawCSVData, RawCSVData, LastBalanceRecord } from '@/lib/fileParser';
-import { 
-  saveLastBalanceRecords, 
-  getLastBalanceCount,
-  getLastBalanceDate,
-  clearLastBalanceRecords 
-} from '@/lib/db';
-import { Upload, Database, Trash2, RefreshCw, Eye } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BalanceRecordsViewer } from '@/components/BalanceRecordsViewer';
 import { BalancePreviewDialog } from '@/components/BalancePreviewDialog';
+import { UploadProgress } from '@/components/UploadProgress';
+import { AccountLookup } from '@/components/AccountLookup';
+import { extractRawCSVData, RawCSVData, LastBalanceRecord } from '@/lib/fileParser';
+import {
+  saveLastBalanceRecords,
+  getLastBalanceCount,
+  getLastBalanceDate,
+  getLastBalanceSchemeSummary,
+  clearLastBalanceRecords,
+  SchemeSummary,
+} from '@/lib/db';
+import { ArrowLeft, Upload, Database, Trash2, RefreshCw, Eye, FileText, CalendarDays, Search } from 'lucide-react';
 
-interface CombinedRawData {
+// Known scheme codes that can be extracted from filenames
+const SCHEME_PATTERNS: Record<string, string> = {
+  'SSA': 'SSA',
+  'SBCHQ': 'SBCHQ',
+  'SBGEN': 'SBGEN',
+  'SBBAS': 'SBBAS',
+  'RD': 'RD',
+  'TD': 'TD',
+  'MIS': 'MIS',
+  'SCSS': 'SCSS',
+  'PPF': 'PPF',
+  'NSC': 'NSC',
+  'KVP': 'KVP',
+};
+
+function extractSchemeFromFilename(filename: string): string {
+  const upperName = filename.toUpperCase();
+  for (const [pattern, scheme] of Object.entries(SCHEME_PATTERNS)) {
+    if (upperName.includes(pattern)) {
+      return scheme;
+    }
+  }
+  return '';
+}
+
+interface ParsedFileData {
   rawData: RawCSVData;
   fileName: string;
+  schemeFromFilename: string;
 }
 
 export const AccountDetails = () => {
+  const navigate = useNavigate();
   const [balanceFiles, setBalanceFiles] = useState<File[]>([]);
   const [processing, setProcessing] = useState(false);
-  const [savedBalanceInfo, setSavedBalanceInfo] = useState<{ count: number; date: string | null }>({ count: 0, date: null });
-  const [previewData, setPreviewData] = useState<CombinedRawData | null>(null);
+  const [uploadProgress, setUploadProgress] = useState({ processed: 0, total: 0, currentFile: '' });
+  const [savedBalanceInfo, setSavedBalanceInfo] = useState<{
+    count: number;
+    date: string | null;
+    schemeSummary: SchemeSummary[];
+  }>({
+    count: 0,
+    date: null,
+    schemeSummary: [],
+  });
+  
+  // Multi-file processing state
+  const [parsedFiles, setParsedFiles] = useState<ParsedFileData[]>([]);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
+  const [totalSavedCount, setTotalSavedCount] = useState(0);
+  
   const { toast } = useToast();
 
   useEffect(() => {
@@ -35,7 +83,8 @@ export const AccountDetails = () => {
   const loadSavedBalanceInfo = async () => {
     const count = await getLastBalanceCount();
     const date = await getLastBalanceDate();
-    setSavedBalanceInfo({ count, date });
+    const schemeSummary = await getLastBalanceSchemeSummary();
+    setSavedBalanceInfo({ count, date, schemeSummary });
   };
 
   const handleClearSavedBalance = async () => {
@@ -44,58 +93,56 @@ export const AccountDetails = () => {
       await loadSavedBalanceInfo();
       toast({
         title: 'Cleared',
-        description: 'Saved balance data has been cleared'
+        description: 'Saved balance data has been cleared',
       });
     }
   };
 
-  const handleParseAndPreview = async () => {
+  const handleParseAllFiles = async () => {
     if (balanceFiles.length === 0) {
       toast({
         title: 'No files selected',
         description: 'Please select Last Balance CSV file(s)',
-        variant: 'destructive'
+        variant: 'destructive',
       });
       return;
     }
 
     setProcessing(true);
+    const parsed: ParsedFileData[] = [];
+
     try {
-      // For now, we process the first file for preview with manual mapping
-      // Multiple files will be combined with the same mapping
-      const file = balanceFiles[0];
-      const rawData = await extractRawCSVData(file);
-      
-      // Combine additional files if any
-      if (balanceFiles.length > 1) {
-        for (let i = 1; i < balanceFiles.length; i++) {
-          const additionalRaw = await extractRawCSVData(balanceFiles[i]);
-          rawData.rows.push(...additionalRaw.rows);
-          if (additionalRaw.preparedDate > rawData.preparedDate) {
-            rawData.preparedDate = additionalRaw.preparedDate;
-          }
+      for (const file of balanceFiles) {
+        const rawData = await extractRawCSVData(file);
+        const schemeFromFilename = extractSchemeFromFilename(file.name);
+        
+        if (rawData.rows.length > 0) {
+          parsed.push({
+            rawData,
+            fileName: file.name,
+            schemeFromFilename,
+          });
         }
       }
 
-      if (rawData.rows.length === 0) {
+      if (parsed.length === 0) {
         toast({
           title: 'No data found',
           description: 'Could not find any data rows in the selected file(s)',
-          variant: 'destructive'
+          variant: 'destructive',
         });
         return;
       }
 
-      setPreviewData({
-        rawData,
-        fileName: balanceFiles.map(f => f.name).join(', ')
-      });
+      setParsedFiles(parsed);
+      setCurrentFileIndex(0);
+      setTotalSavedCount(0);
       setShowPreview(true);
     } catch (error: any) {
       toast({
         title: 'Parse failed',
         description: error.message,
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setProcessing(false);
@@ -103,149 +150,263 @@ export const AccountDetails = () => {
   };
 
   const handleConfirmSave = async (records: LastBalanceRecord[], preparedDate: string) => {
+    const currentFile = parsedFiles[currentFileIndex];
+    if (!currentFile) return;
+
     setProcessing(true);
+    setUploadProgress({ processed: 0, total: records.length, currentFile: currentFile.fileName });
+
     try {
-      const savedCount = await saveLastBalanceRecords(records.map(r => ({
+      // Apply scheme from filename to all records that don't have one
+      const recordsWithScheme = records.map(r => ({
         account: r.account,
         name: r.name,
         address: r.address,
         balance: r.balance,
-        balance_date: r.balance_date,
-        bo_name: r.bo_name,
-        scheme_type: r.scheme_type
-      })));
+        balance_date: preparedDate,
+        // Use scheme from record if available, otherwise use filename-extracted scheme
+        scheme_type: r.scheme_type || currentFile.schemeFromFilename,
+        // Use BO name from record
+        bo_name: r.bo_name || '',
+      }));
 
-      await loadSavedBalanceInfo();
+      const savedCount = await saveLastBalanceRecords(
+        recordsWithScheme,
+        (processed, total) => {
+          setUploadProgress({ processed, total, currentFile: currentFile.fileName });
+        }
+      );
 
-      toast({
-        title: 'Balance data saved',
-        description: `Saved ${savedCount} balance records`
-      });
+      setTotalSavedCount(prev => prev + savedCount);
 
-      setBalanceFiles([]);
-      setPreviewData(null);
-      setShowPreview(false);
-      
-      // Reset the file input
-      const fileInput = document.getElementById('balance-upload') as HTMLInputElement;
-      if (fileInput) fileInput.value = '';
+      // Check if there are more files to process
+      if (currentFileIndex < parsedFiles.length - 1) {
+        setCurrentFileIndex(prev => prev + 1);
+        toast({
+          title: `File ${currentFileIndex + 1} saved`,
+          description: `${savedCount} records from ${currentFile.fileName}. Processing next file...`,
+        });
+      } else {
+        // All files processed
+        await loadSavedBalanceInfo();
+        
+        toast({
+          title: 'All files processed',
+          description: `Total ${totalSavedCount + savedCount} records saved from ${parsedFiles.length} file(s)`,
+        });
+
+        // Reset state
+        setBalanceFiles([]);
+        setParsedFiles([]);
+        setCurrentFileIndex(0);
+        setShowPreview(false);
+        
+        const fileInput = document.getElementById('balance-upload') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+      }
     } catch (error: any) {
       toast({
         title: 'Save failed',
         description: error.message,
-        variant: 'destructive'
+        variant: 'destructive',
       });
     } finally {
       setProcessing(false);
+      setUploadProgress({ processed: 0, total: 0, currentFile: '' });
     }
   };
 
   const handleCancelPreview = () => {
     setShowPreview(false);
-    setPreviewData(null);
+    setParsedFiles([]);
+    setCurrentFileIndex(0);
   };
+
+  const currentParsedFile = parsedFiles[currentFileIndex];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-foreground">Account Details</h2>
-        <p className="text-muted-foreground mt-1">Manage saved balance data for account verification</p>
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/operations')}>
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Account Details</h1>
+          <p className="text-muted-foreground">Manage saved balance data for account verification</p>
+        </div>
       </div>
 
-      {/* Saved Balance Data Info */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Database className="h-5 w-5 text-primary" />
-            Saved Balance Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {savedBalanceInfo.count > 0 ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">
-                  {savedBalanceInfo.count.toLocaleString()} accounts saved
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Balance date: {savedBalanceInfo.date || 'Unknown'}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button 
-                  size="sm" 
-                  variant="outline" 
-                  onClick={loadSavedBalanceInfo}
-                  title="Refresh"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="destructive" 
-                  onClick={handleClearSavedBalance}
-                  title="Clear saved data"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No saved balance data. Upload Last Balance file(s) below.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      {/* Tabs Interface */}
+      <Tabs defaultValue="lookup" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="lookup" className="flex items-center gap-2">
+            <Search className="h-4 w-4" />
+            Account Lookup
+          </TabsTrigger>
+          <TabsTrigger value="upload" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Upload Data
+          </TabsTrigger>
+          <TabsTrigger value="records" className="flex items-center gap-2">
+            <Database className="h-4 w-4" />
+            Saved Records
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Upload Last Balance */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload Last Balance</CardTitle>
-          <CardDescription>
-            Upload Last Balance CSV files to save account details for memo generation
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="balance-upload">Last Balance Files (CSV)</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                id="balance-upload"
-                type="file"
-                accept=".csv"
-                multiple
-                onChange={(e) => setBalanceFiles(Array.from(e.target.files || []))}
-              />
-              {balanceFiles.length > 0 && (
-                <span className="text-sm text-green-500">{balanceFiles.length} files</span>
+        {/* Account Lookup Tab */}
+        <TabsContent value="lookup" className="mt-6">
+          <AccountLookup />
+        </TabsContent>
+
+        {/* Upload Data Tab */}
+        <TabsContent value="upload" className="mt-6 space-y-6">
+          {/* Saved Balance Summary */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-primary" />
+                  <CardTitle className="text-base">Saved Balance Summary</CardTitle>
+                </div>
+                {savedBalanceInfo.count > 0 && (
+                  <Button variant="outline" size="sm" onClick={handleClearSavedBalance}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear Data
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {savedBalanceInfo.count > 0 ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-lg bg-muted/30">
+                    <div>
+                      <p className="text-2xl font-bold">{savedBalanceInfo.count.toLocaleString()}</p>
+                      <p className="text-sm text-muted-foreground">accounts saved</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CalendarDays className="h-4 w-4" />
+                        Last Balance Dated
+                      </div>
+                      <p className="font-medium text-lg">{savedBalanceInfo.date || 'Unknown'}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Scheme Summary */}
+                  {savedBalanceInfo.schemeSummary.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-muted-foreground">Accounts by Scheme</p>
+                      <div className="flex flex-wrap gap-2">
+                        {savedBalanceInfo.schemeSummary.map(({ scheme, count }) => (
+                          <Badge key={scheme} variant="secondary" className="text-sm px-3 py-1">
+                            {scheme}: {count.toLocaleString()}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Button variant="outline" onClick={loadSavedBalanceInfo}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-4">
+                  No saved balance data. Upload Last Balance file(s) below.
+                </p>
               )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Uploading new files will add/update the saved balance data. Use manual mapping if auto-detection fails.
-            </p>
-          </div>
+            </CardContent>
+          </Card>
 
-          <Button 
-            onClick={handleParseAndPreview} 
-            disabled={processing || balanceFiles.length === 0}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            {processing ? 'Parsing...' : 'Preview & Upload'}
-          </Button>
-        </CardContent>
-      </Card>
+          {/* Upload Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-5 w-5" />
+                Upload Last Balance
+              </CardTitle>
+              <CardDescription>
+                Upload Last Balance CSV files. Scheme type (SSA, SBCHQ, etc.) will be extracted from filenames automatically.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="balance-upload">Last Balance Files (CSV/Excel)</Label>
+                <Input
+                  id="balance-upload"
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  multiple
+                  onChange={(e) => setBalanceFiles(Array.from(e.target.files || []))}
+                />
+                {balanceFiles.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">{balanceFiles.length} file(s) selected:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {balanceFiles.map((file, i) => {
+                        const scheme = extractSchemeFromFilename(file.name);
+                        return (
+                          <div key={i} className="flex items-center gap-1 text-xs bg-muted/50 px-2 py-1 rounded">
+                            <FileText className="h-3 w-3" />
+                            <span>{file.name}</span>
+                            {scheme && <Badge variant="secondary" className="text-xs">{scheme}</Badge>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
 
-      {/* Balance Records Viewer */}
-      <BalanceRecordsViewer />
+              <p className="text-xs text-muted-foreground">
+                Tip: Name your files with scheme codes (e.g., "LastBal_SSA.csv") to auto-assign schemes to all accounts in that file.
+              </p>
 
-      {/* Preview Dialog */}
-      {previewData && (
+              {processing && uploadProgress.total > 0 && (
+                <UploadProgress
+                  fileName={uploadProgress.currentFile}
+                  processed={uploadProgress.processed}
+                  total={uploadProgress.total}
+                  status="processing"
+                />
+              )}
+
+              <Button onClick={handleParseAllFiles} disabled={balanceFiles.length === 0 || processing}>
+                <Eye className="w-4 h-4 mr-2" />
+                {processing ? 'Parsing...' : 'Preview & Upload'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Saved Records Tab */}
+        <TabsContent value="records" className="mt-6">
+          {savedBalanceInfo.count > 0 ? (
+            <BalanceRecordsViewer />
+          ) : (
+            <Card>
+              <CardContent className="py-12">
+                <div className="text-center text-muted-foreground">
+                  <Database className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                  <p>No saved balance data.</p>
+                  <p className="text-sm">Upload Last Balance files from the "Upload Data" tab.</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Preview Dialog - process one file at a time */}
+      {currentParsedFile && (
         <BalancePreviewDialog
           open={showPreview}
           onOpenChange={setShowPreview}
-          rawData={previewData.rawData}
-          fileName={previewData.fileName}
+          rawData={currentParsedFile.rawData}
+          fileName={`${currentParsedFile.fileName}${currentParsedFile.schemeFromFilename ? ` (Scheme: ${currentParsedFile.schemeFromFilename})` : ''} [File ${currentFileIndex + 1}/${parsedFiles.length}]`}
           onConfirm={handleConfirmSave}
           onCancel={handleCancelPreview}
         />
