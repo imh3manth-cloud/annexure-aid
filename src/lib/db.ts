@@ -69,6 +69,11 @@ export interface AppSettings {
   groupByBO: boolean;
 }
 
+export interface SchemeSummary {
+  scheme: string;
+  count: number;
+}
+
 // Helper to get user ID - returns null if not authenticated
 const getUserId = async (): Promise<string | null> => {
   const { data: { user } } = await supabase.auth.getUser();
@@ -225,7 +230,7 @@ const updateSettings = async (updates: Partial<{ lastSerial: number; threshold: 
 
 // =================== Memos ===================
 
-const getAllMemos = async (): Promise<MemoRecord[]> => {
+export const getAllMemos = async (): Promise<MemoRecord[]> => {
   const userId = await getUserId();
   if (!userId) return [];
   
@@ -337,7 +342,10 @@ export const clearAllMemos = async (): Promise<number> => {
 
 // =================== Last Balance Records ===================
 
-export const saveLastBalanceRecords = async (records: Omit<LastBalanceRecord, 'id' | 'uploaded_at'>[]) => {
+export const saveLastBalanceRecords = async (
+  records: Omit<LastBalanceRecord, 'id' | 'uploaded_at'>[],
+  onProgress?: (processed: number, total: number) => void
+) => {
   const userId = await getUserId();
   if (!userId) return 0;
   
@@ -379,12 +387,23 @@ export const saveLastBalanceRecords = async (records: Omit<LastBalanceRecord, 'i
     }
   }
   
-  if (toInsert.length > 0) {
-    await supabase.from('last_balance_records').insert(toInsert);
+  let processed = 0;
+  const total = records.length;
+  
+  // Insert in batches
+  const BATCH_SIZE = 100;
+  for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+    const batch = toInsert.slice(i, i + BATCH_SIZE);
+    await supabase.from('last_balance_records').insert(batch);
+    processed += batch.length;
+    onProgress?.(processed, total);
   }
   
+  // Update records
   for (const { id, updates } of toUpdate) {
     await supabase.from('last_balance_records').update(updates).eq('id', id);
+    processed++;
+    onProgress?.(processed, total);
   }
   
   return records.length;
@@ -438,6 +457,28 @@ export const clearLastBalanceRecords = async (): Promise<void> => {
     .from('last_balance_records')
     .delete()
     .eq('user_id', userId);
+};
+
+export const getLastBalanceSchemeSummary = async (): Promise<SchemeSummary[]> => {
+  const userId = await getUserId();
+  if (!userId) return [];
+  
+  const { data, error } = await supabase
+    .from('last_balance_records')
+    .select('scheme_type')
+    .eq('user_id', userId);
+  
+  if (error) throw error;
+  
+  const counts: Record<string, number> = {};
+  for (const row of data || []) {
+    const scheme = row.scheme_type || 'Unknown';
+    counts[scheme] = (counts[scheme] || 0) + 1;
+  }
+  
+  return Object.entries(counts)
+    .map(([scheme, count]) => ({ scheme, count }))
+    .sort((a, b) => b.count - a.count);
 };
 
 export const updateLastBalanceRecord = async (id: string | number, updates: Partial<Omit<LastBalanceRecord, 'id' | 'uploaded_at'>>) => {
