@@ -684,6 +684,27 @@ export const getDaysSinceLastDespatch = async (): Promise<number | null> => {
   return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 };
 
+export const deleteDespatchRecord = async (id: string | number): Promise<void> => {
+  const userId = await getUserId();
+  if (!userId) return;
+  
+  await supabase
+    .from('despatch_records')
+    .delete()
+    .eq('id', String(id))
+    .eq('user_id', userId);
+};
+
+export const clearDespatchRecords = async (): Promise<void> => {
+  const userId = await getUserId();
+  if (!userId) return;
+  
+  await supabase
+    .from('despatch_records')
+    .delete()
+    .eq('user_id', userId);
+};
+
 // =================== Generate Memos from HFTI ===================
 
 export const generateMemosFromHFTI = async (

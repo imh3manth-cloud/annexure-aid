@@ -4,14 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { db, MemoRecord, saveDespatchRecord, getAllDespatchRecords, getDaysSinceLastDespatch, DespatchRecord } from '@/lib/db';
-import { Send, Bell, Calendar, Clock, Settings, CalendarCheck } from 'lucide-react';
+import { db, MemoRecord, saveDespatchRecord, getAllDespatchRecords, getDaysSinceLastDespatch, DespatchRecord, deleteDespatchRecord } from '@/lib/db';
+import { Send, Bell, Calendar, Clock, Settings, CalendarCheck, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DespatchManager } from './DespatchManager';
 import { ManualSentDateUpdater } from './ManualSentDateUpdater';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface DespatchDialogProps {
   onDespatchSaved?: () => void;
@@ -315,6 +316,7 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
                       <TableHead>Post No.</TableHead>
                       <TableHead>Despatch Date</TableHead>
                       <TableHead className="text-right">Memos</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -324,6 +326,41 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
                         <TableCell>{record.post_number}</TableCell>
                         <TableCell>{formatDate(record.despatch_date)}</TableCell>
                         <TableCell className="text-right">{record.memo_count}</TableCell>
+                        <TableCell>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete despatch record?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This will delete the despatch record (Post No: {record.post_number}, Memos: {record.from_memo}-{record.to_memo}). 
+                                  Note: This only removes the record from history, it does NOT affect the memo data.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={async () => {
+                                    await deleteDespatchRecord(record.id!);
+                                    toast({ title: 'Despatch record deleted' });
+                                    await fetchDespatchHistory();
+                                    onDespatchSaved?.();
+                                  }}
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
