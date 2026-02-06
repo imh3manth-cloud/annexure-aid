@@ -37,6 +37,7 @@ export interface RawCSVData {
   preparedDate: string;
   autoMapping: ColumnMapping;
   headerRowIndex: number;
+  detectedScheme: string;
 }
 
 // Normalize header names
@@ -144,15 +145,37 @@ export const extractRawCSVData = (file: File): Promise<RawCSVData> => {
       skipEmptyLines: true,
       complete: (results) => {
         try {
-          const rows = results.data as string[][];
+         const rows = results.data as string[][];
           
-          // Extract prepared date
+          // Known scheme patterns to detect from file content
+          const SCHEME_KEYWORDS = ['SSA', 'SBCHQ', 'SBGEN', 'SBBAS', 'RD', 'TD', 'MIS', 'SCSS', 'PPF', 'NSC', 'KVP'];
+          
+          // Extract prepared date and detect scheme from metadata rows
           let preparedDate = new Date().toISOString().split('T')[0];
+          let detectedScheme = '';
+          
           for (let i = 0; i < Math.min(15, rows.length); i++) {
             const row = rows[i];
-            const rowText = row.join(' ').toLowerCase();
+            const rowText = row.join(' ');
+            const rowTextLower = rowText.toLowerCase();
             
-            if (rowText.includes('prepared') || rowText.includes('date') || rowText.includes('as on') || rowText.includes('timestamp')) {
+            // Detect scheme from metadata rows (before header row)
+            if (!detectedScheme) {
+              const rowTextUpper = rowText.toUpperCase();
+              for (const scheme of SCHEME_KEYWORDS) {
+                // Match scheme as whole word or part of a product code
+                if (new RegExp(`\\b${scheme}\\b`, 'i').test(rowTextUpper) ||
+                    rowTextUpper.includes(`/${scheme}`) || 
+                    rowTextUpper.includes(`${scheme}/`) ||
+                    rowTextUpper.includes(`-${scheme}`) ||
+                    rowTextUpper.includes(`${scheme}-`)) {
+                  detectedScheme = scheme;
+                  break;
+                }
+              }
+            }
+            
+            if (rowTextLower.includes('prepared') || rowTextLower.includes('date') || rowTextLower.includes('as on') || rowTextLower.includes('timestamp')) {
               for (let j = 0; j < row.length; j++) {
                 const cell = String(row[j] || '').trim();
                 const dateMatch = cell.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
@@ -237,7 +260,8 @@ export const extractRawCSVData = (file: File): Promise<RawCSVData> => {
             rows: dataRows,
             preparedDate,
             autoMapping,
-            headerRowIndex
+            headerRowIndex,
+            detectedScheme
           });
         } catch (error) {
           reject(error);

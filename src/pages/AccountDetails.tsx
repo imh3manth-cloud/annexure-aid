@@ -115,12 +115,14 @@ export const AccountDetails = () => {
       for (const file of balanceFiles) {
         const rawData = await extractRawCSVData(file);
         const schemeFromFilename = extractSchemeFromFilename(file.name);
+        // Prefer scheme detected from file content, fallback to filename
+        const schemeFromFile = rawData.detectedScheme || schemeFromFilename;
         
         if (rawData.rows.length > 0) {
           parsed.push({
             rawData,
             fileName: file.name,
-            schemeFromFilename,
+            schemeFromFilename: schemeFromFile,
           });
         }
       }
