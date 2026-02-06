@@ -137,7 +137,65 @@ export const parseHFTIFile = (file: File): Promise<HFTITransaction[]> => {
   });
 };
 
-// Extract raw CSV data for manual mapping
+// Check if a row looks like a header row (contains "account" and "name"/"cust")
+const isHeaderRow = (row: string[]): boolean => {
+  const rowStr = row.map(c => String(c || '').toLowerCase().trim()).join('|');
+  return rowStr.includes('account') && (rowStr.includes('name') || rowStr.includes('cust'));
+};
+
+// Check if a row is a metadata/page-break row to skip
+const isMetadataRow = (row: string[]): boolean => {
+  const rowText = row.join(' ').toLowerCase();
+  return (
+    rowText.includes('india post') ||
+    rowText.includes('last balance report') ||
+    /page\s+\d+\s+(of|\/)\s*\d+/i.test(rowText) ||
+    rowText.includes('prepared date') ||
+    rowText.includes('sol id') ||
+    rowText.includes('branch id') ||
+    rowText.includes('scheme :') ||
+    rowText.includes('total no of') ||
+    // Row is mostly empty (metadata lines with sparse content)
+    (row.filter(c => String(c || '').trim()).length <= 3 && !(/^\d+$/.test(String(row[0] || '').trim())))
+  );
+};
+
+// Detect column mapping from a header row
+const detectHeaderMapping = (row: string[]): Record<string, number> => {
+  const mapping: Record<string, number> = {};
+  for (let idx = 0; idx < row.length; idx++) {
+    const h = String(row[idx] || '').toLowerCase().trim();
+    if (!h) continue;
+    if (h.includes('account') && (h.includes('number') || h.includes('no') || h.includes('id') || h === 'account number')) {
+      mapping.account = idx;
+    } else if ((h.includes('cust1') || h.includes('cust 1')) && h.includes('name')) {
+      mapping.name = idx;
+    } else if ((h.includes('cust') && h.includes('name')) || h === 'name' || h === 'customer name') {
+      if (!('name' in mapping)) mapping.name = idx;
+    } else if (h.includes('cif') && h.includes('id')) {
+      if (!('cif' in mapping)) mapping.cif = idx;
+    } else if (h.includes('address') || h.includes('addr')) {
+      mapping.address = idx;
+    } else if (h.includes('balance') && (h.includes('after') || h.includes('transaction') || h.includes('amt'))) {
+      mapping.balance = idx;
+    } else if (h.includes('balance') || h.includes('outstanding')) {
+      if (!('balance' in mapping)) mapping.balance = idx;
+    } else if (h.includes('date') && h.includes('last')) {
+      mapping.lastTxnDate = idx;
+    } else if (h.includes('status')) {
+      mapping.status = idx;
+    } else if (h.includes('bo') && h.includes('name')) {
+      mapping.boName = idx;
+    } else if (h.includes('account') && h.includes('type')) {
+      // skip account type
+    } else if (h.includes('scheme') || h.includes('product')) {
+      mapping.schemeType = idx;
+    }
+  }
+  return mapping;
+};
+
+// Extract raw CSV data for manual mapping - handles multi-page reports with shifting columns
 export const extractRawCSVData = (file: File): Promise<RawCSVData> => {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
@@ -145,12 +203,12 @@ export const extractRawCSVData = (file: File): Promise<RawCSVData> => {
       skipEmptyLines: true,
       complete: (results) => {
         try {
-         const rows = results.data as string[][];
+          const rows = results.data as string[][];
           
           // Known scheme patterns to detect from file content
           const SCHEME_KEYWORDS = ['SSA', 'SBCHQ', 'SBGEN', 'SBBAS', 'RD', 'TD', 'MIS', 'SCSS', 'PPF', 'NSC', 'KVP'];
           
-          // Extract prepared date and detect scheme from metadata rows
+          // Extract prepared date and detect scheme from first 15 metadata rows
           let preparedDate = new Date().toISOString().split('T')[0];
           let detectedScheme = '';
           
@@ -159,11 +217,10 @@ export const extractRawCSVData = (file: File): Promise<RawCSVData> => {
             const rowText = row.join(' ');
             const rowTextLower = rowText.toLowerCase();
             
-            // Detect scheme from metadata rows (before header row)
+            // Detect scheme from metadata rows
             if (!detectedScheme) {
               const rowTextUpper = rowText.toUpperCase();
               for (const scheme of SCHEME_KEYWORDS) {
-                // Match scheme as whole word or part of a product code
                 if (new RegExp(`\\b${scheme}\\b`, 'i').test(rowTextUpper) ||
                     rowTextUpper.includes(`/${scheme}`) || 
                     rowTextUpper.includes(`${scheme}/`) ||
@@ -191,76 +248,74 @@ export const extractRawCSVData = (file: File): Promise<RawCSVData> => {
             }
           }
           
-          // Find header row and auto-detect mappings
-          let headerRowIndex = -1;
-          let autoMapping: ColumnMapping = {
-            account: null,
-            name: null,
-            name2: null,
-            address: null,
-            balance: null,
-            scheme_type: null,
-            status: null,
-            bo_name: null
-          };
+          // Find ALL header rows and their positions
+          const headerPositions: { index: number; mapping: Record<string, number> }[] = [];
           
-          for (let i = 0; i < Math.min(20, rows.length); i++) {
-            const row = rows[i];
-            const rowStr = row.map((c: any) => String(c || '').toLowerCase()).join('|');
-            
-            if (rowStr.includes('account') && (rowStr.includes('name') || rowStr.includes('cust'))) {
-              headerRowIndex = i;
-              
-              row.forEach((cell: any, idx: number) => {
-                const headerLower = String(cell || '').toLowerCase().trim();
-                
-                if (headerLower.includes('account') && (headerLower.includes('number') || headerLower.includes('no') || headerLower.includes('id'))) {
-                  autoMapping.account = idx;
-                } else if (headerLower.includes('scheme') || headerLower.includes('product')) {
-                  autoMapping.scheme_type = idx;
-                } else if (headerLower.includes('status') || headerLower.includes('a/c status') || headerLower.includes('account status')) {
-                  autoMapping.status = idx;
-                } else if ((headerLower.includes('cust') && headerLower.includes('name')) || 
-                           headerLower === 'name' || headerLower === 'customer name') {
-                  if (autoMapping.name === null) autoMapping.name = idx;
-                  else if (autoMapping.name2 === null) autoMapping.name2 = idx;
-                } else if (headerLower.includes('cust1') || headerLower.includes('cust 1')) {
-                  autoMapping.name = idx;
-                } else if (headerLower.includes('cust2') || headerLower.includes('cust 2')) {
-                  autoMapping.name2 = idx;
-                } else if (headerLower.includes('address') || headerLower.includes('addr')) {
-                  autoMapping.address = idx;
-                } else if (headerLower.includes('balance') || headerLower.includes('bal') || 
-                           headerLower.includes('outstanding') || headerLower.includes('amount')) {
-                  if (autoMapping.balance === null) autoMapping.balance = idx;
-                } else if (headerLower.includes('bo') || headerLower.includes('branch') || 
-                           headerLower.includes('office name') || headerLower.includes('so name')) {
-                  autoMapping.bo_name = idx;
-                }
-              });
-              break;
+          for (let i = 0; i < rows.length; i++) {
+            if (isHeaderRow(rows[i])) {
+              headerPositions.push({ index: i, mapping: detectHeaderMapping(rows[i]) });
             }
           }
           
-          if (headerRowIndex === -1) {
-            // Fallback: use first row with multiple columns as header
-            for (let i = 0; i < Math.min(10, rows.length); i++) {
-              if (rows[i].length >= 5) {
-                headerRowIndex = i;
+          // Canonical output columns
+          const canonicalHeaders = ['Account Number', 'Name', 'CIF ID', 'Address', 'Balance', 'Last Txn Date', 'Status', 'BO Name'];
+          const normalizedRows: string[][] = [];
+          
+          // Process each data row using the mapping from its closest preceding header
+          for (let i = 0; i < rows.length; i++) {
+            // Skip header rows themselves
+            if (headerPositions.some(h => h.index === i)) continue;
+            
+            // Skip metadata/page-break rows
+            if (isMetadataRow(rows[i])) continue;
+            
+            // Find the mapping for this row (from closest preceding header)
+            let currentMapping: Record<string, number> | null = null;
+            for (let h = headerPositions.length - 1; h >= 0; h--) {
+              if (i > headerPositions[h].index) {
+                currentMapping = headerPositions[h].mapping;
                 break;
               }
             }
+            
+            if (!currentMapping) continue; // Row before any header
+            
+            const row = rows[i];
+            
+            // Extract account number
+            const account = currentMapping.account !== undefined ? String(row[currentMapping.account] || '').trim() : '';
+            // Must have a valid account number (at least 5 digits)
+            if (!account || !/\d{5,}/.test(account.replace(/\D/g, ''))) continue;
+            
+            const name = currentMapping.name !== undefined ? String(row[currentMapping.name] || '').trim() : '';
+            const cif = currentMapping.cif !== undefined ? String(row[currentMapping.cif] || '').trim() : '';
+            const address = currentMapping.address !== undefined ? String(row[currentMapping.address] || '').trim() : '';
+            const balance = currentMapping.balance !== undefined ? String(row[currentMapping.balance] || '').trim() : '';
+            const lastTxnDate = currentMapping.lastTxnDate !== undefined ? String(row[currentMapping.lastTxnDate] || '').trim() : '';
+            const status = currentMapping.status !== undefined ? String(row[currentMapping.status] || '').trim() : '';
+            const boName = currentMapping.boName !== undefined ? String(row[currentMapping.boName] || '').trim() : '';
+            
+            normalizedRows.push([account, name, cif, address, balance, lastTxnDate, status, boName]);
           }
           
-          const headers = headerRowIndex >= 0 ? rows[headerRowIndex].map(h => String(h || '').trim()) : [];
-          const dataRows = headerRowIndex >= 0 ? rows.slice(headerRowIndex + 1) : rows;
+          // Create canonical auto-mapping pointing to normalized columns
+          const autoMapping: ColumnMapping = {
+            account: 0,
+            name: 1,
+            name2: null,
+            address: 3,
+            balance: 4,
+            scheme_type: null, // scheme comes from file metadata/filename
+            status: 6,
+            bo_name: 7
+          };
           
           resolve({
-            headers,
-            rows: dataRows,
+            headers: canonicalHeaders,
+            rows: normalizedRows,
             preparedDate,
             autoMapping,
-            headerRowIndex,
+            headerRowIndex: 0,
             detectedScheme
           });
         } catch (error) {
