@@ -394,16 +394,8 @@ export const applyColumnMapping = (
       schemeType = String(row[mapping.scheme_type]).trim();
     }
     
-    // Extract and combine status
-    let status = '';
-    if (mapping.status !== null && row[mapping.status]) {
-      status = String(row[mapping.status]).trim();
-    }
-    if (status && schemeType) {
-      schemeType = `${schemeType} (${status})`;
-    } else if (status) {
-      schemeType = status;
-    }
+    // Status is separate - do NOT merge into scheme_type
+    // scheme_type should come from filename/file metadata only
     
     // Extract BO Name
     let boName = '';

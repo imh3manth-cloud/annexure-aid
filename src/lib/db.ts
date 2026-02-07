@@ -413,13 +413,27 @@ export const getAllLastBalanceRecords = async (): Promise<LastBalanceRecord[]> =
   const userId = await getUserId();
   if (!userId) return [];
   
-  const { data, error } = await supabase
-    .from('last_balance_records')
-    .select('*')
-    .eq('user_id', userId);
+  // Paginate to fetch all records beyond Supabase's default 1000-row limit
+  const allData: any[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
   
-  if (error) throw error;
-  return (data || []).map(dbToBalance);
+  while (true) {
+    const { data, error } = await supabase
+      .from('last_balance_records')
+      .select('*')
+      .eq('user_id', userId)
+      .range(from, from + PAGE_SIZE - 1);
+    
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    
+    allData.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  
+  return allData.map(dbToBalance);
 };
 
 export const getLastBalanceCount = async (): Promise<number> => {
@@ -463,16 +477,30 @@ export const getLastBalanceSchemeSummary = async (): Promise<SchemeSummary[]> =>
   const userId = await getUserId();
   if (!userId) return [];
   
-  const { data, error } = await supabase
-    .from('last_balance_records')
-    .select('scheme_type')
-    .eq('user_id', userId);
+  // Paginate to get all scheme_type values
+  const allSchemes: string[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
   
-  if (error) throw error;
+  while (true) {
+    const { data, error } = await supabase
+      .from('last_balance_records')
+      .select('scheme_type')
+      .eq('user_id', userId)
+      .range(from, from + PAGE_SIZE - 1);
+    
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    
+    for (const row of data) {
+      allSchemes.push(row.scheme_type || 'Unknown');
+    }
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
   
   const counts: Record<string, number> = {};
-  for (const row of data || []) {
-    const scheme = row.scheme_type || 'Unknown';
+  for (const scheme of allSchemes) {
     counts[scheme] = (counts[scheme] || 0) + 1;
   }
   
