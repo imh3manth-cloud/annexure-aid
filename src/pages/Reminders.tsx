@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, MemoRecord } from '@/lib/db';
+import { db, MemoRecord, addReminderHistoryEntry } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { generateReminderPDF, generateOverdueReportPDF } from '@/lib/pdfGenerato
 import { Bell, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DespatchDialog } from '@/components/DespatchDialog';
+import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
 
 export const Reminders = () => {
   const navigate = useNavigate();
@@ -113,7 +114,7 @@ export const Reminders = () => {
         sortedMemos.push(...group);
       });
 
-      // Update memo records
+      // Update memo records and save to reminder history
       for (const memo of sortedMemos) {
         const newReminderCount = memo.reminder_count + 1;
         const newRemarks = memo.remarks
@@ -125,6 +126,9 @@ export const Reminders = () => {
           last_reminder_date: reminderDate,
           remarks: newRemarks
         });
+
+        // Save to reminder history table
+        await addReminderHistoryEntry(memo.id as string, newReminderCount, reminderDate);
       }
 
       // Generate PDF addressed to Inspector of Posts
@@ -240,6 +244,7 @@ export const Reminders = () => {
                       <TableHead>Amount</TableHead>
                       <TableHead>Memo Sent</TableHead>
                       <TableHead>Reminders</TableHead>
+                      <TableHead>History</TableHead>
                       <TableHead>Last Reminder</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -261,6 +266,9 @@ export const Reminders = () => {
                         </TableCell>
                         <TableCell className="text-sm">{memo.memo_sent_date || 'N/A'}</TableCell>
                         <TableCell className="text-sm">{memo.reminder_count}</TableCell>
+                        <TableCell>
+                          <ReminderHistoryDialog memo={memo} onUpdated={loadMemos} />
+                        </TableCell>
                         <TableCell className="text-sm">{memo.last_reminder_date || 'None'}</TableCell>
                       </TableRow>
                     ))}
@@ -318,6 +326,7 @@ export const Reminders = () => {
                       <TableHead>Branch</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Reminders</TableHead>
+                      <TableHead>History</TableHead>
                       <TableHead>Last Reminder</TableHead>
                       <TableHead>Days Overdue</TableHead>
                     </TableRow>
@@ -353,6 +362,9 @@ export const Reminders = () => {
                               ₹{memo.amount.toLocaleString('en-IN')}
                             </TableCell>
                             <TableCell className="text-sm">{memo.reminder_count}</TableCell>
+                            <TableCell>
+                              <ReminderHistoryDialog memo={memo} onUpdated={loadMemos} />
+                            </TableCell>
                             <TableCell className="text-sm">{memo.last_reminder_date}</TableCell>
                             <TableCell className="text-sm font-bold text-destructive">{daysOverdue} days</TableCell>
                           </TableRow>

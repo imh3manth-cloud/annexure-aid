@@ -236,6 +236,47 @@ export type Database = {
         }
         Relationships: []
       }
+      reminder_history: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          id: string
+          memo_id: string
+          reminder_date: string
+          reminder_number: number
+          status: string
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          memo_id: string
+          reminder_date: string
+          reminder_number: number
+          status?: string
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          id?: string
+          memo_id?: string
+          reminder_date?: string
+          reminder_number?: number
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_history_memo_id_fkey"
+            columns: ["memo_id"]
+            isOneToOne: false
+            referencedRelation: "memos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
