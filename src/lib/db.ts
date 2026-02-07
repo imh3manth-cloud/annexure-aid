@@ -49,6 +49,16 @@ export interface DespatchRecord {
   created_at: string;
 }
 
+export interface ReminderHistoryRecord {
+  id?: string;
+  memo_id: string;
+  reminder_number: number;
+  reminder_date: string;
+  status: 'Active' | 'Cancelled';
+  cancelled_at: string | null;
+  created_at: string;
+}
+
 export interface HFTITransactionRecord {
   id?: string | number;
   txn_date: string;
@@ -1086,4 +1096,90 @@ export const db = {
       };
     }
   }
+};
+
+// ============ Reminder History Functions ============
+
+export const getReminderHistory = async (memoId: string): Promise<ReminderHistoryRecord[]> => {
+  const userId = await getUserId();
+  if (!userId) return [];
+  
+  const { data, error } = await supabase
+    .from('reminder_history')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('memo_id', memoId)
+    .order('reminder_number', { ascending: true });
+  
+  if (error) throw error;
+  return (data || []).map(r => ({
+    id: r.id,
+    memo_id: r.memo_id,
+    reminder_number: r.reminder_number,
+    reminder_date: r.reminder_date,
+    status: r.status as 'Active' | 'Cancelled',
+    cancelled_at: r.cancelled_at,
+    created_at: r.created_at
+  }));
+};
+
+export const addReminderHistoryEntry = async (memoId: string, reminderNumber: number, reminderDate: string): Promise<void> => {
+  const userId = await getUserId();
+  if (!userId) throw new Error('Not authenticated');
+  
+  const { error } = await supabase
+    .from('reminder_history')
+    .insert({
+      user_id: userId,
+      memo_id: memoId,
+      reminder_number: reminderNumber,
+      reminder_date: reminderDate,
+      status: 'Active'
+    });
+  
+  if (error) throw error;
+};
+
+export const updateReminderDate = async (reminderId: string, newDate: string): Promise<void> => {
+  const { error } = await supabase
+    .from('reminder_history')
+    .update({ reminder_date: newDate })
+    .eq('id', reminderId);
+  
+  if (error) throw error;
+};
+
+export const cancelReminder = async (reminderId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('reminder_history')
+    .update({ status: 'Cancelled', cancelled_at: new Date().toISOString() })
+    .eq('id', reminderId);
+  
+  if (error) throw error;
+};
+
+export const recalculateMemoReminders = async (memoId: string): Promise<void> => {
+  const history = await getReminderHistory(memoId);
+  const activeReminders = history.filter(r => r.status === 'Active');
+  
+  const newCount = activeReminders.length;
+  const lastActive = activeReminders.length > 0 
+    ? activeReminders[activeReminders.length - 1] 
+    : null;
+  
+  // Rebuild remarks from active reminders
+  const reminderRemarks = activeReminders
+    .map(r => `Reminder ${r.reminder_number} on ${r.reminder_date}`)
+    .join('; ');
+  
+  const { error } = await supabase
+    .from('memos')
+    .update({
+      reminder_count: newCount,
+      last_reminder_date: lastActive?.reminder_date || null,
+      remarks: reminderRemarks || ''
+    })
+    .eq('id', memoId);
+  
+  if (error) throw error;
 };
