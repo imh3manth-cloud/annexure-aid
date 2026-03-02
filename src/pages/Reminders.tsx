@@ -21,6 +21,10 @@ export const Reminders = () => {
   const [selected, setSelected] = useState<Set<string | number>>(new Set());
   const [overdueSelected, setOverdueSelected] = useState<Set<string | number>>(new Set());
   const [reminderDate, setReminderDate] = useState(new Date().toISOString().split('T')[0]);
+  const [fromSerial, setFromSerial] = useState<string>('');
+  const [toSerial, setToSerial] = useState<string>('');
+  const [reminderNumber, setReminderNumber] = useState<string>('');
+  const [filteredMemos, setFilteredMemos] = useState<MemoRecord[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -38,7 +42,6 @@ export const Reminders = () => {
     const overdue: MemoRecord[] = [];
     
     memos.forEach(memo => {
-      // Check if memo has reminder and is overdue (15 days from last reminder)
       if (memo.last_reminder_date && memo.reminder_count > 0) {
         const lastReminder = new Date(memo.last_reminder_date);
         const daysSinceReminder = Math.floor((today.getTime() - lastReminder.getTime()) / (1000 * 60 * 60 * 24));
@@ -54,25 +57,28 @@ export const Reminders = () => {
     
     setPendingMemos(pending);
     setOverdueMemos(overdue);
-  };
 
-  const toggleSelect = (id: string | number) => {
-    const newSelected = new Set(selected);
-    if (newSelected.has(id)) {
-      newSelected.delete(id);
-    } else {
-      newSelected.add(id);
+    // Auto-suggest serial range: first and last pending memo serials
+    if (pending.length > 0) {
+      const sortedBySerial = [...pending].sort((a, b) => a.serial - b.serial);
+      setFromSerial(String(sortedBySerial[0].serial));
+      setToSerial(String(sortedBySerial[sortedBySerial.length - 1].serial));
     }
-    setSelected(newSelected);
   };
 
-  const toggleSelectAll = () => {
-    if (selected.size === pendingMemos.length) {
+  // Filter memos by serial range
+  useEffect(() => {
+    const from = parseInt(fromSerial);
+    const to = parseInt(toSerial);
+    if (!isNaN(from) && !isNaN(to) && from > 0 && to >= from) {
+      const filtered = pendingMemos.filter(m => m.serial >= from && m.serial <= to);
+      setFilteredMemos(filtered);
+      setSelected(new Set(filtered.map(m => m.id!)));
+    } else {
+      setFilteredMemos([]);
       setSelected(new Set());
-    } else {
-      setSelected(new Set(pendingMemos.map(m => m.id!)));
     }
-  };
+  }, [fromSerial, toSerial, pendingMemos]);
 
   const toggleOverdueSelect = (id: string | number) => {
     const newSelected = new Set(overdueSelected);
@@ -93,9 +99,22 @@ export const Reminders = () => {
   };
 
   const handleGenerateReminder = async () => {
-    const selectedMemos = pendingMemos.filter(m => selected.has(m.id!));
+    const from = parseInt(fromSerial);
+    const to = parseInt(toSerial);
+    const remNum = parseInt(reminderNumber);
+
+    if (isNaN(from) || isNaN(to) || from > to) {
+      toast({ title: 'Invalid serial range', variant: 'destructive' });
+      return;
+    }
+    if (isNaN(remNum) || remNum < 1) {
+      toast({ title: 'Enter a valid reminder number', variant: 'destructive' });
+      return;
+    }
+
+    const selectedMemos = filteredMemos;
     if (selectedMemos.length === 0) {
-      toast({ title: 'No memos selected', variant: 'destructive' });
+      toast({ title: 'No pending memos in this serial range', variant: 'destructive' });
       return;
     }
 
@@ -108,35 +127,31 @@ export const Reminders = () => {
         return acc;
       }, {} as Record<string, MemoRecord[]>);
       
-      // Flatten back but grouped
       const sortedMemos: MemoRecord[] = [];
       Object.values(groupedByBO).forEach(group => {
         sortedMemos.push(...group);
       });
 
-      // Update memo records and save to reminder history
+      // Update memo records using the entered reminder number
       for (const memo of sortedMemos) {
-        const newReminderCount = memo.reminder_count + 1;
         const newRemarks = memo.remarks
-          ? `${memo.remarks}; Reminder ${newReminderCount} on ${reminderDate}`
-          : `Reminder ${newReminderCount} on ${reminderDate}`;
+          ? `${memo.remarks}; Reminder ${remNum} on ${reminderDate}`
+          : `Reminder ${remNum} on ${reminderDate}`;
 
         await db.memos.update(memo.id!, {
-          reminder_count: newReminderCount,
+          reminder_count: remNum,
           last_reminder_date: reminderDate,
           remarks: newRemarks
         });
 
-        // Save to reminder history table
-        await addReminderHistoryEntry(memo.id as string, newReminderCount, reminderDate);
+        await addReminderHistoryEntry(memo.id as string, remNum, reminderDate);
       }
 
-      // Generate PDF addressed to Inspector of Posts
       const updatedMemos = await db.memos.bulkGet(sortedMemos.map(m => m.id!));
       const pdf = generateReminderPDF(updatedMemos.filter(Boolean) as MemoRecord[]);
-      pdf.save(`reminder_to_IP_${reminderDate}.pdf`);
+      pdf.save(`reminder_${remNum}_to_IP_${reminderDate}.pdf`);
 
-      toast({ title: 'Reminder PDF generated', description: 'Addressed to Inspector of Posts' });
+      toast({ title: 'Reminder PDF generated', description: `Reminder ${remNum} for serials ${from}-${to} (${sortedMemos.length} memos)` });
       setSelected(new Set());
       loadMemos();
     } catch (error: any) {
@@ -200,8 +215,39 @@ export const Reminders = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-end gap-4">
-                <div className="flex-1 space-y-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                <div className="space-y-2">
+                  <Label htmlFor="fromSerial">From Memo No.</Label>
+                  <Input
+                    id="fromSerial"
+                    type="number"
+                    placeholder="e.g. 1"
+                    value={fromSerial}
+                    onChange={(e) => setFromSerial(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="toSerial">To Memo No.</Label>
+                  <Input
+                    id="toSerial"
+                    type="number"
+                    placeholder="e.g. 50"
+                    value={toSerial}
+                    onChange={(e) => setToSerial(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reminderNumber">Reminder No.</Label>
+                  <Input
+                    id="reminderNumber"
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 1"
+                    value={reminderNumber}
+                    onChange={(e) => setReminderNumber(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="reminderDate">Reminder Date</Label>
                   <Input
                     id="reminderDate"
@@ -210,14 +256,19 @@ export const Reminders = () => {
                     onChange={(e) => setReminderDate(e.target.value)}
                   />
                 </div>
-                <Button
-                  onClick={handleGenerateReminder}
-                  disabled={selected.size === 0}
-                >
-                  <Bell className="w-4 h-4 mr-2" />
-                  Generate Reminder to IP ({selected.size})
-                </Button>
               </div>
+              {filteredMemos.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {filteredMemos.length} pending memo(s) found in serial range {fromSerial}–{toSerial}
+                </p>
+              )}
+              <Button
+                onClick={handleGenerateReminder}
+                disabled={filteredMemos.length === 0 || !reminderNumber}
+              >
+                <Bell className="w-4 h-4 mr-2" />
+                Generate Reminder {reminderNumber || '?'} to IP ({filteredMemos.length} memos)
+              </Button>
             </CardContent>
           </Card>
 
@@ -231,12 +282,6 @@ export const Reminders = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={selected.size === pendingMemos.length && pendingMemos.length > 0}
-                          onCheckedChange={toggleSelectAll}
-                        />
-                      </TableHead>
                       <TableHead>Serial</TableHead>
                       <TableHead>Account No</TableHead>
                       <TableHead>Name</TableHead>
@@ -249,29 +294,26 @@ export const Reminders = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {pendingMemos.map((memo) => (
-                      <TableRow key={memo.id}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selected.has(memo.id!)}
-                            onCheckedChange={() => toggleSelect(memo.id!)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">{memo.serial}</TableCell>
-                        <TableCell className="text-sm">{memo.account}</TableCell>
-                        <TableCell className="text-sm max-w-[200px] truncate">{memo.name}</TableCell>
-                        <TableCell className="text-sm">{memo.BO_Name}</TableCell>
-                        <TableCell className="text-sm font-medium">
-                          ₹{memo.amount.toLocaleString('en-IN')}
-                        </TableCell>
-                        <TableCell className="text-sm">{memo.memo_sent_date || 'N/A'}</TableCell>
-                        <TableCell className="text-sm">{memo.reminder_count}</TableCell>
-                        <TableCell>
-                          <ReminderHistoryDialog memo={memo} onUpdated={loadMemos} />
-                        </TableCell>
-                        <TableCell className="text-sm">{memo.last_reminder_date || 'None'}</TableCell>
-                      </TableRow>
-                    ))}
+                    {pendingMemos.map((memo) => {
+                      const inRange = selected.has(memo.id!);
+                      return (
+                        <TableRow key={memo.id} className={inRange ? 'bg-primary/5' : ''}>
+                          <TableCell className="font-medium">{memo.serial}</TableCell>
+                          <TableCell className="text-sm">{memo.account}</TableCell>
+                          <TableCell className="text-sm max-w-[200px] truncate">{memo.name}</TableCell>
+                          <TableCell className="text-sm">{memo.BO_Name}</TableCell>
+                          <TableCell className="text-sm font-medium">
+                            ₹{memo.amount.toLocaleString('en-IN')}
+                          </TableCell>
+                          <TableCell className="text-sm">{memo.memo_sent_date || 'N/A'}</TableCell>
+                          <TableCell className="text-sm">{memo.reminder_count}</TableCell>
+                          <TableCell>
+                            <ReminderHistoryDialog memo={memo} onUpdated={loadMemos} />
+                          </TableCell>
+                          <TableCell className="text-sm">{memo.last_reminder_date || 'None'}</TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
