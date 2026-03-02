@@ -1,17 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  getAllLastBalanceRecords,
-  getAllMemos,
-  getAllHFTITransactions,
-  LastBalanceRecord, 
-  MemoRecord, 
-  HFTITransactionRecord 
-} from '@/lib/db';
+import { cachedLookupAccount, isCachePopulated, syncAll, getCacheSyncStatus } from '@/lib/localCache';
+import { LastBalanceRecord, MemoRecord, HFTITransactionRecord } from '@/lib/db';
 import {
   Search,
   User,
@@ -23,12 +17,16 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  RefreshCw,
+  WifiOff,
+  Wifi,
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface AccountLookupData {
-  balance: LastBalanceRecord | null;
-  memos: MemoRecord[];
-  hftiTransactions: HFTITransactionRecord[];
+  balance: any | null;
+  memos: any[];
+  hftiTransactions: any[];
 }
 
 export function AccountLookup() {
@@ -36,8 +34,40 @@ export function AccountLookup() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [data, setData] = useState<AccountLookupData | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [cacheReady, setCacheReady] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<Record<string, any>>({});
+  const { toast } = useToast();
 
-  const normalizeAccount = (acc: string) => acc.replace(/\D/g, '').replace(/^0+/, '') || '0';
+  useEffect(() => {
+    checkCache();
+  }, []);
+
+  const checkCache = async () => {
+    const populated = await isCachePopulated();
+    setCacheReady(populated);
+    const status = await getCacheSyncStatus();
+    setSyncStatus(status);
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      const result = await syncAll((msg) => {
+        // Could show progress in UI
+      });
+      setCacheReady(true);
+      await checkCache();
+      toast({
+        title: 'Data synced for offline use',
+        description: `${result.balance} accounts, ${result.memos} memos, ${result.hfti} transactions cached locally`,
+      });
+    } catch (error: any) {
+      toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleSearch = async () => {
     let query = accountQuery.trim();
@@ -47,35 +77,28 @@ export function AccountLookup() {
     setSearched(true);
 
     try {
-      const normalizedQuery = normalizeAccount(query);
-      
-      // Get all records and filter client-side for flexible matching
-      const [balanceRecords, memoRecords, hftiRecords] = await Promise.all([
-        getAllLastBalanceRecords(),
-        getAllMemos(),
-        getAllHFTITransactions()
-      ]);
+      if (cacheReady) {
+        // Use instant local cache
+        const result = await cachedLookupAccount(query);
+        setData(result);
+      } else {
+        // Fallback: import from db and search server-side
+        const { getAllLastBalanceRecords, getAllMemos, getAllHFTITransactions } = await import('@/lib/db');
+        const normalizeAccount = (acc: string) => acc.replace(/\D/g, '').replace(/^0+/, '') || '0';
+        const normalizedQuery = normalizeAccount(query);
+        
+        const [balanceRecords, memoRecords, hftiRecords] = await Promise.all([
+          getAllLastBalanceRecords(),
+          getAllMemos(),
+          getAllHFTITransactions()
+        ]);
 
-      // Find matching balance record
-      const balanceRecord = balanceRecords.find(r => 
-        normalizeAccount(r.account) === normalizedQuery
-      );
-
-      // Find matching memos
-      const matchingMemos = memoRecords.filter(m => 
-        normalizeAccount(m.account) === normalizedQuery
-      );
-
-      // Find matching HFTI transactions
-      const matchingHfti = hftiRecords.filter(t => 
-        normalizeAccount(t.account) === normalizedQuery
-      );
-
-      setData({
-        balance: balanceRecord || null,
-        memos: matchingMemos,
-        hftiTransactions: matchingHfti,
-      });
+        setData({
+          balance: balanceRecords.find(r => normalizeAccount(r.account) === normalizedQuery) || null,
+          memos: memoRecords.filter(m => normalizeAccount(m.account) === normalizedQuery),
+          hftiTransactions: hftiRecords.filter(t => normalizeAccount(t.account) === normalizedQuery),
+        });
+      }
     } catch (error) {
       console.error('Search failed:', error);
       setData(null);
@@ -125,13 +148,39 @@ export function AccountLookup() {
     pending: data.memos.filter(m => m.status === 'Pending').length,
   } : null;
 
+  const lastSynced = syncStatus.balanceRecords?.lastSyncedAt 
+    ? new Date(syncStatus.balanceRecords.lastSyncedAt).toLocaleString() 
+    : null;
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Search className="h-5 w-5" />
-          Account Lookup
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5" />
+            Account Lookup
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {cacheReady ? (
+              <Badge variant="outline" className="gap-1 text-xs">
+                <Wifi className="h-3 w-3 text-green-500" />
+                Offline Ready
+              </Badge>
+            ) : (
+              <Badge variant="secondary" className="gap-1 text-xs">
+                <WifiOff className="h-3 w-3" />
+                Not Synced
+              </Badge>
+            )}
+            <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+              <RefreshCw className={`h-4 w-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </Button>
+          </div>
+        </div>
+        {lastSynced && (
+          <p className="text-xs text-muted-foreground">Last synced: {lastSynced}</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Search Input */}
@@ -147,6 +196,12 @@ export function AccountLookup() {
             {loading ? 'Searching...' : 'Search'}
           </Button>
         </div>
+
+        {!cacheReady && !searched && (
+          <div className="text-center py-4 text-muted-foreground text-sm">
+            <p>Click <strong>Sync</strong> to download data for instant offline search.</p>
+          </div>
+        )}
 
         {/* Results */}
         {searched && !loading && (
@@ -181,7 +236,7 @@ export function AccountLookup() {
                         <Wallet className="h-5 w-5 text-primary mt-0.5" />
                         <div>
                           <p className="text-sm text-muted-foreground">Balance</p>
-                          <p className="font-medium">₹{data.balance.balance.toLocaleString()}</p>
+                          <p className="font-medium">₹{Number(data.balance.balance).toLocaleString()}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
@@ -232,10 +287,10 @@ export function AccountLookup() {
                               {getStatusIcon(memo.status)}
                               <div>
                                 <p className="font-medium">
-                                  Memo #{memo.serial} - ₹{memo.amount.toLocaleString()}
+                                  Memo #{memo.serial} - ₹{Number(memo.amount).toLocaleString()}
                                 </p>
                                 <p className="text-sm text-muted-foreground">
-                                  {memo.txn_date} • {memo.BO_Name || 'Unknown BO'}
+                                  {memo.txn_date} • {memo.bo_name || memo.BO_Name || 'Unknown BO'}
                                 </p>
                               </div>
                             </div>
@@ -262,7 +317,7 @@ export function AccountLookup() {
                           <div key={txn.id} className="flex items-center justify-between p-3 rounded-lg border">
                             <div>
                               <p className="font-medium">
-                                {txn.debit_credit === 'D' ? 'Debit' : 'Credit'} - ₹{txn.amount.toLocaleString()}
+                                {txn.debit_credit === 'D' ? 'Debit' : 'Credit'} - ₹{Number(txn.amount).toLocaleString()}
                               </p>
                               <p className="text-sm text-muted-foreground">
                                 {txn.txn_date} • {txn.particulars?.slice(0, 50) || 'N/A'}
