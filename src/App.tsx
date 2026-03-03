@@ -16,6 +16,7 @@ import { Settings } from "./pages/Settings";
 import { AccountDetails } from "./pages/AccountDetails";
 import { Operations } from "./pages/Operations";
 import { HFTIRegister } from "./pages/HFTIRegister";
+import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
 import { initSettings } from "./lib/supabaseDb";
@@ -139,6 +140,7 @@ function AppRoutes() {
           </Layout>
         </ProtectedRoute>
       } />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
