@@ -138,13 +138,24 @@ export async function syncMemos(onProgress?: (msg: string) => void): Promise<num
   if (!userId) return 0;
 
   onProgress?.('Fetching memos...');
-  const { data, error } = await supabase
-    .from('memos')
-    .select('*')
-    .eq('user_id', userId);
+  const allData: any[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
 
-  if (error) throw error;
-  const allData = data || [];
+  while (true) {
+    const { data, error } = await supabase
+      .from('memos')
+      .select('*')
+      .eq('user_id', userId)
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData.push(...data);
+    onProgress?.(`Fetched ${allData.length} memos...`);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
 
   await cacheDb.memos.clear();
   const cached: CachedMemo[] = allData.map(r => ({
@@ -186,13 +197,24 @@ export async function syncHFTI(onProgress?: (msg: string) => void): Promise<numb
   if (!userId) return 0;
 
   onProgress?.('Fetching HFTI transactions...');
-  const { data, error } = await supabase
-    .from('hfti_transactions')
-    .select('*')
-    .eq('user_id', userId);
+  const allData: any[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
 
-  if (error) throw error;
-  const allData = data || [];
+  while (true) {
+    const { data, error } = await supabase
+      .from('hfti_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData.push(...data);
+    onProgress?.(`Fetched ${allData.length} HFTI transactions...`);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
 
   await cacheDb.hftiTransactions.clear();
   const cached: CachedHFTI[] = allData.map(r => ({
