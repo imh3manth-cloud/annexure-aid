@@ -78,6 +78,10 @@ const cacheDb = new LocalCacheDB();
 const normalize = (acc: string) => acc.replace(/\D/g, '').replace(/^0+/, '') || '0';
 
 const getUserId = async (): Promise<string | null> => {
+  // Use getSession (local token) instead of getUser (network call) for reliability
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user?.id) return session.user.id;
+  // Fallback to getUser if session not available
   const { data: { user } } = await supabase.auth.getUser();
   return user?.id || null;
 };
