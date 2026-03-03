@@ -4,7 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { cachedLookupAccount, isCachePopulated, syncAll, getCacheSyncStatus } from '@/lib/localCache';
+import { Progress } from '@/components/ui/progress';
+import { cachedLookupAccount, isCachePopulated, syncBalanceRecords, syncMemos, syncHFTI, getCacheSyncStatus } from '@/lib/localCache';
 import { LastBalanceRecord, MemoRecord, HFTITransactionRecord } from '@/lib/db';
 import {
   Search,
@@ -35,6 +36,8 @@ export function AccountLookup() {
   const [searched, setSearched] = useState(false);
   const [data, setData] = useState<AccountLookupData | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState('');
+  const [syncStep, setSyncStep] = useState(0); // 0=idle, 1=balance, 2=memos, 3=hfti, 4=done
   const [cacheReady, setCacheReady] = useState(false);
   const [syncStatus, setSyncStatus] = useState<Record<string, any>>({});
   const { toast } = useToast();
@@ -52,20 +55,32 @@ export function AccountLookup() {
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncStep(1);
+    setSyncProgress('');
     try {
-      const result = await syncAll((msg) => {
-        // Could show progress in UI
-      });
+      setSyncProgress('Syncing balance records...');
+      const balanceCount = await syncBalanceRecords((msg) => setSyncProgress(msg));
+      
+      setSyncStep(2);
+      setSyncProgress('Syncing memos...');
+      const memoCount = await syncMemos((msg) => setSyncProgress(msg));
+      
+      setSyncStep(3);
+      setSyncProgress('Syncing HFTI transactions...');
+      const hftiCount = await syncHFTI((msg) => setSyncProgress(msg));
+      
+      setSyncStep(4);
       setCacheReady(true);
       await checkCache();
       toast({
         title: 'Data synced for offline use',
-        description: `${result.balance} accounts, ${result.memos} memos, ${result.hfti} transactions cached locally`,
+        description: `${balanceCount} accounts, ${memoCount} memos, ${hftiCount} transactions cached locally`,
       });
     } catch (error: any) {
       toast({ title: 'Sync failed', description: error.message, variant: 'destructive' });
     } finally {
       setSyncing(false);
+      setTimeout(() => { setSyncStep(0); setSyncProgress(''); }, 2000);
     }
   };
 
@@ -178,8 +193,32 @@ export function AccountLookup() {
             </Button>
           </div>
         </div>
-        {lastSynced && (
+        {lastSynced && !syncing && (
           <p className="text-xs text-muted-foreground">Last synced: {lastSynced}</p>
+        )}
+        {syncing && (
+          <div className="space-y-2 mt-2">
+            <div className="flex items-center gap-2">
+              <Progress value={syncStep === 4 ? 100 : (syncStep / 3) * 100} className="h-2 flex-1" />
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {syncStep}/3
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className={syncStep >= 1 ? 'text-primary font-medium' : ''}>
+                {syncStep > 1 ? '✓' : '●'} Balances
+              </span>
+              <span className={syncStep >= 2 ? 'text-primary font-medium' : ''}>
+                {syncStep > 2 ? '✓' : syncStep === 2 ? '●' : '○'} Memos
+              </span>
+              <span className={syncStep >= 3 ? 'text-primary font-medium' : ''}>
+                {syncStep > 3 ? '✓' : syncStep === 3 ? '●' : '○'} HFTI
+              </span>
+            </div>
+            {syncProgress && (
+              <p className="text-xs text-muted-foreground animate-pulse">{syncProgress}</p>
+            )}
+          </div>
         )}
       </CardHeader>
       <CardContent className="space-y-6">
