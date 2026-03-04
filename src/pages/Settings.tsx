@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/db';
-import { Download, Upload, Trash2, Save } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Download, Upload, Trash2, Save, RotateCcw } from 'lucide-react';
 
 interface AppConfig {
   officeName: string;
@@ -194,6 +195,55 @@ export const Settings = () => {
     }
   };
 
+  const handleResetReminders = async () => {
+    if (!confirm('This will reset reminder counts and reported status on all pending/reported memos, so you can start fresh with Reminder 1 to IP. Continue?')) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({ title: 'Not authenticated', variant: 'destructive' });
+        return;
+      }
+
+      // Reset reminder_count, last_reminder_date, and change Reported back to Pending
+      const { error: err1 } = await supabase
+        .from('memos')
+        .update({ 
+          reminder_count: 0, 
+          last_reminder_date: null,
+          remarks: ''
+        })
+        .eq('user_id', user.id)
+        .in('status', ['Pending', 'Reported']);
+
+      if (err1) throw err1;
+
+      // Change Reported memos back to Pending
+      const { error: err2 } = await supabase
+        .from('memos')
+        .update({ 
+          status: 'Pending',
+          reported_date: null
+        })
+        .eq('user_id', user.id)
+        .eq('status', 'Reported');
+
+      if (err2) throw err2;
+
+      // Delete reminder history for this user
+      const { error: err3 } = await supabase
+        .from('reminder_history')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (err3) throw err3;
+
+      toast({ title: 'Reminders reset successfully. You can now generate Reminder 1 to IP.' });
+    } catch (error: any) {
+      toast({ title: 'Reset failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -254,6 +304,31 @@ export const Settings = () => {
           <Button onClick={handleSave}>
             <Save className="w-4 h-4 mr-2" />
             Save Configuration
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Reminder Management</CardTitle>
+          <CardDescription>Reset reminder counts to start the reminder cycle fresh</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="bg-muted p-4 rounded-lg space-y-2">
+            <p className="text-sm text-muted-foreground">
+              If memos are incorrectly showing higher reminder numbers or are marked as &quot;Reported to SP&quot; 
+              before reminders were actually generated, use this to reset all reminders back to zero. 
+              This will allow you to start fresh with Reminder 1 to IP.
+            </p>
+            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+              <li>Resets reminder count to 0 on all Pending and Reported memos</li>
+              <li>Changes &quot;Reported&quot; memos back to &quot;Pending&quot; status</li>
+              <li>Clears all reminder history records</li>
+            </ul>
+          </div>
+          <Button onClick={handleResetReminders} variant="outline" className="border-amber-500 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950">
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset All Reminders
           </Button>
         </CardContent>
       </Card>
