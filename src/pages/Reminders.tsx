@@ -32,37 +32,44 @@ export const Reminders = () => {
   }, []);
 
   const loadMemos = async () => {
-    const memos = await db.memos
-      .where('status')
-      .equals('Pending')
-      .sortBy('serial');
-    
-    const today = new Date();
-    const pending: MemoRecord[] = [];
-    const overdue: MemoRecord[] = [];
-    
-    memos.forEach(memo => {
-      if (memo.last_reminder_date && memo.reminder_count > 0) {
-        const lastReminder = new Date(memo.last_reminder_date);
-        const daysSinceReminder = Math.floor((today.getTime() - lastReminder.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysSinceReminder > 15) {
-          overdue.push(memo);
+    try {
+      const memos = await db.memos
+        .where('status')
+        .equals('Pending')
+        .sortBy('serial');
+      
+      console.log('Loaded pending memos:', memos.length);
+      
+      const today = new Date();
+      const pending: MemoRecord[] = [];
+      const overdue: MemoRecord[] = [];
+      
+      memos.forEach(memo => {
+        if (memo.last_reminder_date && memo.reminder_count > 0) {
+          const lastReminder = new Date(memo.last_reminder_date);
+          const daysSinceReminder = Math.floor((today.getTime() - lastReminder.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysSinceReminder > 15) {
+            overdue.push(memo);
+          } else {
+            pending.push(memo);
+          }
         } else {
           pending.push(memo);
         }
-      } else {
-        pending.push(memo);
-      }
-    });
-    
-    setPendingMemos(pending);
-    setOverdueMemos(overdue);
+      });
+      
+      setPendingMemos(pending);
+      setOverdueMemos(overdue);
 
-    // Auto-suggest serial range: first and last pending memo serials
-    if (pending.length > 0) {
-      const sortedBySerial = [...pending].sort((a, b) => a.serial - b.serial);
-      setFromSerial(String(sortedBySerial[0].serial));
-      setToSerial(String(sortedBySerial[sortedBySerial.length - 1].serial));
+      // Auto-suggest serial range: first and last pending memo serials
+      if (pending.length > 0) {
+        const sortedBySerial = [...pending].sort((a, b) => a.serial - b.serial);
+        setFromSerial(String(sortedBySerial[0].serial));
+        setToSerial(String(sortedBySerial[sortedBySerial.length - 1].serial));
+      }
+    } catch (error: any) {
+      console.error('Failed to load memos:', error);
+      toast({ title: 'Failed to load memos', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -99,6 +106,7 @@ export const Reminders = () => {
   };
 
   const handleGenerateReminder = async () => {
+    console.log('Generate reminder clicked', { fromSerial, toSerial, reminderNumber, filteredMemosCount: filteredMemos.length });
     const from = parseInt(fromSerial);
     const to = parseInt(toSerial);
     const remNum = parseInt(reminderNumber);
