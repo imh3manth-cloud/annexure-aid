@@ -42,13 +42,20 @@ export function Auth() {
     }
     
     setLoading(true);
-    const { error } = await signIn(email, password);
-    setLoading(false);
-    
-    if (error) {
-      toast.error(error.message || 'Failed to sign in');
-    } else {
-      toast.success('Signed in successfully');
+    try {
+      const { error } = await signIn(email, password);
+      
+      if (error) {
+        console.error('Sign in error:', error);
+        toast.error(error.message || 'Failed to sign in');
+      } else {
+        toast.success('Signed in successfully');
+      }
+    } catch (err) {
+      console.error('Unexpected sign in error:', err);
+      toast.error('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -64,13 +71,20 @@ export function Auth() {
     }
     
     setLoading(true);
-    const { error } = await signUp(email, password);
-    setLoading(false);
-    
-    if (error) {
-      toast.error(error.message || 'Failed to sign up');
-    } else {
-      toast.success('Account created! You can now sign in.');
+    try {
+      const { error } = await signUp(email, password);
+      
+      if (error) {
+        console.error('Sign up error:', error);
+        toast.error(error.message || 'Failed to sign up');
+      } else {
+        toast.success('Account created! Check your email to verify, then sign in.');
+      }
+    } catch (err) {
+      console.error('Unexpected sign up error:', err);
+      toast.error('An unexpected error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
