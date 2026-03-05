@@ -31,7 +31,7 @@ export const Reminders = () => {
     loadMemos();
   }, []);
 
-  const loadMemos = async () => {
+  const loadMemos = async (retryCount = 0) => {
     try {
       const memos = await db.memos
         .where('status')
@@ -69,6 +69,12 @@ export const Reminders = () => {
       }
     } catch (error: any) {
       console.error('Failed to load memos:', error);
+      // Retry once on Dexie lock errors
+      if (retryCount < 2 && error?.message?.includes('lock')) {
+        console.log(`Retrying loadMemos (attempt ${retryCount + 1})...`);
+        setTimeout(() => loadMemos(retryCount + 1), 500);
+        return;
+      }
       toast({ title: 'Failed to load memos', description: error.message, variant: 'destructive' });
     }
   };
