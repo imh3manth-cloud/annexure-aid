@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
 import { generateReminderPDF, generateOverdueReportPDF } from '@/lib/pdfGenerator';
-import { Bell, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Bell, AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DespatchDialog } from '@/components/DespatchDialog';
 import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
@@ -18,6 +18,7 @@ export const Reminders = () => {
   const navigate = useNavigate();
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
   const [overdueMemos, setOverdueMemos] = useState<MemoRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Set<string | number>>(new Set());
   const [overdueSelected, setOverdueSelected] = useState<Set<string | number>>(new Set());
   const [reminderDate, setReminderDate] = useState(new Date().toISOString().split('T')[0]);
@@ -32,6 +33,7 @@ export const Reminders = () => {
   }, []);
 
   const loadMemos = async (retryCount = 0) => {
+    setLoading(true);
     try {
       const memos = await db.memos
         .where('status')
@@ -69,13 +71,14 @@ export const Reminders = () => {
       }
     } catch (error: any) {
       console.error('Failed to load memos:', error);
-      // Retry once on Dexie lock errors
       if (retryCount < 2 && error?.message?.includes('lock')) {
         console.log(`Retrying loadMemos (attempt ${retryCount + 1})...`);
         setTimeout(() => loadMemos(retryCount + 1), 500);
         return;
       }
       toast({ title: 'Failed to load memos', description: error.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -217,6 +220,13 @@ export const Reminders = () => {
           </TabsTrigger>
         </TabsList>
 
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-3">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading memos...</p>
+          </div>
+        ) : (
+        <>
         <TabsContent value="reminders" className="space-y-4">
           <Card>
             <CardHeader>
@@ -433,6 +443,8 @@ export const Reminders = () => {
             </CardContent>
           </Card>
         </TabsContent>
+        </>
+        )}
       </Tabs>
     </div>
   );
