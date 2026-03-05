@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { generateReminderPDF, generateOverdueReportPDF } from '@/lib/pdfGenerator';
 import { Bell, AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { DespatchDialog } from '@/components/DespatchDialog';
 import { ReminderHistoryDialog } from '@/components/ReminderHistoryDialog';
 
@@ -26,6 +27,8 @@ export const Reminders = () => {
   const [toSerial, setToSerial] = useState<string>('');
   const [reminderNumber, setReminderNumber] = useState<string>('');
   const [filteredMemos, setFilteredMemos] = useState<MemoRecord[]>([]);
+  const [isGeneratingReminder, setIsGeneratingReminder] = useState(false);
+  const [reminderProgress, setReminderProgress] = useState({ current: 0, total: 0 });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -135,6 +138,9 @@ export const Reminders = () => {
       return;
     }
 
+    setIsGeneratingReminder(true);
+    setReminderProgress({ current: 0, total: selectedMemos.length });
+
     try {
       // Group by branch office for continuous display
       const groupedByBO = selectedMemos.reduce((acc, memo) => {
@@ -149,8 +155,11 @@ export const Reminders = () => {
         sortedMemos.push(...group);
       });
 
+      setReminderProgress({ current: 0, total: sortedMemos.length });
+
       // Update memo records using the entered reminder number
-      for (const memo of sortedMemos) {
+      for (let index = 0; index < sortedMemos.length; index++) {
+        const memo = sortedMemos[index];
         const newRemarks = memo.remarks
           ? `${memo.remarks}; Reminder ${remNum} on ${reminderDate}`
           : `Reminder ${remNum} on ${reminderDate}`;
@@ -162,6 +171,13 @@ export const Reminders = () => {
         });
 
         await addReminderHistoryEntry(memo.id as string, remNum, reminderDate);
+
+        const processed = index + 1;
+        setReminderProgress({ current: processed, total: sortedMemos.length });
+
+        if (processed % 10 === 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
       }
 
       const updatedMemos = await db.memos.bulkGet(sortedMemos.map(m => m.id!));
@@ -173,6 +189,9 @@ export const Reminders = () => {
       loadMemos();
     } catch (error: any) {
       toast({ title: 'Failed to generate reminder', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsGeneratingReminder(false);
+      setReminderProgress({ current: 0, total: 0 });
     }
   };
 
@@ -288,11 +307,29 @@ export const Reminders = () => {
               )}
               <Button
                 onClick={handleGenerateReminder}
-                disabled={filteredMemos.length === 0 || !reminderNumber}
+                disabled={filteredMemos.length === 0 || !reminderNumber || isGeneratingReminder}
               >
-                <Bell className="w-4 h-4 mr-2" />
-                Generate Reminder {reminderNumber || '?'} to IP ({filteredMemos.length} memos)
+                {isGeneratingReminder ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating Reminder {reminderNumber || '?'}... ({reminderProgress.current}/{reminderProgress.total})
+                  </>
+                ) : (
+                  <>
+                    <Bell className="w-4 h-4 mr-2" />
+                    Generate Reminder {reminderNumber || '?'} to IP ({filteredMemos.length} memos)
+                  </>
+                )}
               </Button>
+              {isGeneratingReminder && reminderProgress.total > 0 && (
+                <div className="space-y-2 max-w-md">
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>Processing reminders...</span>
+                    <span>{reminderProgress.current}/{reminderProgress.total}</span>
+                  </div>
+                  <Progress value={(reminderProgress.current / reminderProgress.total) * 100} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
