@@ -1152,6 +1152,65 @@ export const addReminderHistoryEntry = async (memoId: string, reminderNumber: nu
   if (error) throw error;
 };
 
+// Bulk update memos and insert reminder history in batches for speed
+export const bulkUpdateReminders = async (
+  memos: MemoRecord[],
+  reminderNumber: number,
+  reminderDate: string,
+  onProgress?: (current: number, total: number) => void
+): Promise<void> => {
+  const userId = await getUserId();
+  if (!userId) throw new Error('Not authenticated');
+
+  const BATCH_SIZE = 50;
+  const total = memos.length;
+
+  for (let i = 0; i < total; i += BATCH_SIZE) {
+    const batch = memos.slice(i, i + BATCH_SIZE);
+    const ids = batch.map(m => String(m.id));
+
+    // Build new remarks for each memo
+    const updatePromises = batch.map(memo => {
+      const newRemarks = memo.remarks
+        ? `${memo.remarks}; Reminder ${reminderNumber} on ${reminderDate}`
+        : `Reminder ${reminderNumber} on ${reminderDate}`;
+
+      return supabase
+        .from('memos')
+        .update({
+          reminder_count: reminderNumber,
+          last_reminder_date: reminderDate,
+          remarks: newRemarks
+        })
+        .eq('id', String(memo.id))
+        .eq('user_id', userId);
+    });
+
+    // Insert reminder history entries in bulk
+    const historyEntries = batch.map(memo => ({
+      user_id: userId,
+      memo_id: String(memo.id),
+      reminder_number: reminderNumber,
+      reminder_date: reminderDate,
+      status: 'Active' as const
+    }));
+
+    const historyPromise = supabase
+      .from('reminder_history')
+      .insert(historyEntries);
+
+    // Execute all in parallel
+    const results = await Promise.all([...updatePromises, historyPromise]);
+    
+    // Check for errors
+    for (const result of results) {
+      if (result.error) throw result.error;
+    }
+
+    onProgress?.(Math.min(i + BATCH_SIZE, total), total);
+  }
+};
+
 export const updateReminderDate = async (reminderId: string, newDate: string): Promise<void> => {
   const { error } = await supabase
     .from('reminder_history')
