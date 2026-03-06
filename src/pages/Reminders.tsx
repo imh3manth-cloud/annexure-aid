@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { db, MemoRecord, addReminderHistoryEntry } from '@/lib/db';
+import { db, MemoRecord, bulkUpdateReminders } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -142,44 +142,23 @@ export const Reminders = () => {
     setReminderProgress({ current: 0, total: selectedMemos.length });
 
     try {
-      // Group by branch office for continuous display
-      const groupedByBO = selectedMemos.reduce((acc, memo) => {
-        const key = memo.BO_Name;
-        if (!acc[key]) acc[key] = [];
-        acc[key].push(memo);
-        return acc;
-      }, {} as Record<string, MemoRecord[]>);
-      
-      const sortedMemos: MemoRecord[] = [];
-      Object.values(groupedByBO).forEach(group => {
-        sortedMemos.push(...group);
+      // Sort by BO then serial for organized output
+      const sortedMemos = [...selectedMemos].sort((a, b) => {
+        if (a.BO_Name !== b.BO_Name) return a.BO_Name.localeCompare(b.BO_Name);
+        return a.serial - b.serial;
       });
 
       setReminderProgress({ current: 0, total: sortedMemos.length });
 
-      // Update memo records using the entered reminder number
-      for (let index = 0; index < sortedMemos.length; index++) {
-        const memo = sortedMemos[index];
-        const newRemarks = memo.remarks
-          ? `${memo.remarks}; Reminder ${remNum} on ${reminderDate}`
-          : `Reminder ${remNum} on ${reminderDate}`;
+      // Bulk update all memos and insert reminder history in batches
+      await bulkUpdateReminders(
+        sortedMemos,
+        remNum,
+        reminderDate,
+        (current, total) => setReminderProgress({ current, total })
+      );
 
-        await db.memos.update(memo.id!, {
-          reminder_count: remNum,
-          last_reminder_date: reminderDate,
-          remarks: newRemarks
-        });
-
-        await addReminderHistoryEntry(memo.id as string, remNum, reminderDate);
-
-        const processed = index + 1;
-        setReminderProgress({ current: processed, total: sortedMemos.length });
-
-        if (processed % 10 === 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, 0));
-        }
-      }
-
+      // Fetch updated memos for PDF
       const updatedMemos = await db.memos.bulkGet(sortedMemos.map(m => m.id!));
       const pdf = generateReminderPDF(updatedMemos.filter(Boolean) as MemoRecord[]);
       pdf.save(`reminder_${remNum}_to_IP_${reminderDate}.pdf`);
