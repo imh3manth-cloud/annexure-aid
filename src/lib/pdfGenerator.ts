@@ -758,121 +758,219 @@ export const generateReminderPDF = (memos: MemoRecord[]): jsPDF => {
 export const generateOverdueReportPDF = (memos: MemoRecord[]): jsPDF => {
   const config = getConfig();
   const doc = new jsPDF({
-    orientation: 'landscape',
+    orientation: 'portrait',
     unit: 'mm',
     format: 'a4'
   });
   
-  // Header with addressing to Superintendent
+  const pageWidth = 210;
+  const margin = 15;
+  const contentWidth = pageWidth - 2 * margin;
+  const today = new Date();
+  const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  let y = 15;
+
+  // === LETTER HEADER ===
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('Department of Posts, India', 148, 12, { align: 'center' });
+  doc.text('Department of Posts, India', pageWidth / 2, y, { align: 'center' });
   
+  y += 10;
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  let y = 22;
-  doc.text('To,', 10, y);
+  doc.text('From,', margin, y);
   y += 5;
-  doc.text('The Superintendent of Post Offices,', 10, y);
+  doc.text(`The Sub Postmaster,`, margin + 5, y);
   y += 5;
-  doc.text(`${config.division}`, 10, y);
+  doc.text(`${config.officeName}`, margin + 5, y);
+  y += 5;
+  doc.text(`${config.subdivision}`, margin + 5, y);
+
+  y += 8;
+  doc.text('To,', margin, y);
+  y += 5;
+  doc.text('The Superintendent of Post Offices,', margin + 5, y);
+  y += 5;
+  doc.text(`${config.division}`, margin + 5, y);
+  
+  // Date on right
+  doc.text(`Date: ${dateStr}`, pageWidth - margin, y, { align: 'right' });
   
   // Subject
   y += 10;
   doc.setFont('helvetica', 'bold');
-  doc.text('Sub: Report on Overdue High Value Withdrawal Verification Memos - Reg:', 10, y);
+  doc.setFontSize(10);
+  doc.text('Sub: Report on Overdue High Value Withdrawal Verification Memos - Reg.', margin, y);
   
-  y += 8;
+  // Letter body
+  y += 10;
   doc.setFont('helvetica', 'normal');
-  doc.text('Sir/Madam,', 15, y);
-  y += 6;
-  const bodyText = 'The following High Value Wdl Memos have not received replies despite reminders. No reply received within 15 days from the date of issue of reminder. Submitted for necessary action please.';
-  const bodyLines = doc.splitTextToSize(bodyText, 260);
-  doc.text(bodyLines, 15, y);
-  y += bodyLines.length * 5;
+  doc.setFontSize(10);
+  doc.text('Sir/Madam,', margin + 5, y);
+  y += 7;
+  const bodyText = `With reference to the above subject, it is respectfully submitted that the following High Value Withdrawal Verification Memos (ANNEXURE-4) issued from this office are overdue. Despite issuing reminders to the Inspector of Posts, no replies have been received within 15 days from the date of issue of reminder as per rules. The details of overdue memos are furnished below for your kind perusal and necessary action please.`;
+  const bodyLines = doc.splitTextToSize(bodyText, contentWidth - 10);
+  doc.text(bodyLines, margin + 5, y);
+  y += bodyLines.length * 5 + 5;
+
+  // === SECTION 1: BO-WISE CONSOLIDATED SUMMARY ===
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('I. Consolidated Summary - Branch Office wise overdue memos:', margin, y);
+  y += 7;
   
-  // Table headers
-  y += 8;
-  const startY = y;
-  const rowHeight = 7;
+  // Group memos by BO
+  const boGroups: Record<string, MemoRecord[]> = {};
+  memos.forEach(memo => {
+    const bo = memo.BO_Name || 'Unknown';
+    if (!boGroups[bo]) boGroups[bo] = [];
+    boGroups[bo].push(memo);
+  });
+  
+  const boNames = Object.keys(boGroups).sort();
+  
+  // Summary table header
+  const summaryColWidths = [15, 80, 35, 40];
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   
-  const headers = ['Memo No', 'Account No', 'Depositor Name', 'Branch Office', 'Amount', 'Memo Sent', 'Reminders', 'Last Reminder', 'Days Overdue'];
-  const colWidths = [18, 28, 45, 38, 23, 23, 20, 23, 22];
-  let x = 10;
+  const headerH = 7;
+  doc.rect(margin, y - 4, contentWidth, headerH);
+  let sx = margin + 2;
+  doc.text('Sl.', sx, y);
+  sx += summaryColWidths[0];
+  doc.text('Branch Office', sx, y);
+  sx += summaryColWidths[1];
+  doc.text('No. of Memos', sx, y);
+  sx += summaryColWidths[2];
+  doc.text('Total Amount (₹)', sx, y);
+  y += headerH - 1;
   
-  headers.forEach((header, i) => {
-    doc.text(header, x, startY);
-    x += colWidths[i];
+  // Summary rows
+  doc.setFont('helvetica', 'normal');
+  let grandTotal = 0;
+  let grandCount = 0;
+  
+  boNames.forEach((bo, idx) => {
+    const group = boGroups[bo];
+    const totalAmount = group.reduce((sum, m) => sum + m.amount, 0);
+    grandTotal += totalAmount;
+    grandCount += group.length;
+    
+    const rowH = 6;
+    doc.rect(margin, y - 3.5, contentWidth, rowH);
+    sx = margin + 2;
+    doc.text(String(idx + 1), sx, y);
+    sx += summaryColWidths[0];
+    doc.text(bo, sx, y);
+    sx += summaryColWidths[1];
+    doc.text(String(group.length), sx, y);
+    sx += summaryColWidths[2];
+    doc.text(formatAmount(totalAmount), sx, y);
+    y += rowH;
   });
   
-  // Draw line under headers
-  doc.line(10, startY + 2, 287, startY + 2);
+  // Grand total row
+  const gtRowH = 7;
+  doc.setFont('helvetica', 'bold');
+  doc.rect(margin, y - 3.5, contentWidth, gtRowH);
+  sx = margin + 2;
+  sx += summaryColWidths[0];
+  doc.text('GRAND TOTAL', sx, y);
+  sx += summaryColWidths[1];
+  doc.text(String(grandCount), sx, y);
+  sx += summaryColWidths[2];
+  doc.text(formatAmount(grandTotal), sx, y);
+  y += gtRowH + 8;
+
+  // === SECTION 2: BO-WISE DETAILED TABLE ===
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
   
-  // Table rows
-  doc.setFont('helvetica', 'normal');
-  y = startY + rowHeight;
+  if (y > 250) {
+    doc.addPage();
+    y = 15;
+  }
+  doc.text('II. Branch Office wise Details of Overdue Memos:', margin, y);
+  y += 7;
   
-  const today = new Date();
-  memos.forEach((memo) => {
-    if (y > 185) {
+  const detailColWidths = [18, 28, 25, 55, 30];
+  const detailHeaders = ['Memo No.', 'Account No.', 'Memo Date', 'Depositor Name', 'Amount (₹)'];
+  
+  boNames.forEach((bo) => {
+    const group = boGroups[bo];
+    const boTotal = group.reduce((sum, m) => sum + m.amount, 0);
+    
+    if (y > 255) {
       doc.addPage();
       y = 15;
     }
     
-    x = 10;
-    doc.text(String(memo.serial), x, y);
-    x += colWidths[0];
+    // BO sub-header
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${bo} (${group.length} memos, ₹${formatAmount(boTotal)})`, margin, y);
+    y += 5;
     
-    doc.text(memo.account, x, y);
-    x += colWidths[1];
+    // Detail table header
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    const thH = 6;
+    doc.rect(margin, y - 3.5, contentWidth, thH);
+    let dx = margin + 1;
+    detailHeaders.forEach((h, i) => {
+      doc.text(h, dx, y);
+      dx += detailColWidths[i];
+    });
+    y += thH;
     
-    const name = doc.splitTextToSize(memo.name, colWidths[2] - 2);
-    doc.text(name[0] || '', x, y);
-    x += colWidths[2];
+    // Detail rows
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
     
-    doc.text(memo.BO_Name, x, y, { maxWidth: colWidths[3] - 2 });
-    x += colWidths[3];
+    group.sort((a, b) => a.serial - b.serial).forEach((memo) => {
+      if (y > 280) {
+        doc.addPage();
+        y = 15;
+      }
+      
+      const rowH = 5.5;
+      doc.rect(margin, y - 3.5, contentWidth, rowH);
+      dx = margin + 1;
+      doc.text(String(memo.serial), dx, y);
+      dx += detailColWidths[0];
+      doc.text(memo.account, dx, y);
+      dx += detailColWidths[1];
+      doc.text(memo.memo_sent_date ? formatDate(memo.memo_sent_date) : formatDate(memo.txn_date), dx, y);
+      dx += detailColWidths[2];
+      const nameText = doc.splitTextToSize(memo.name || '', detailColWidths[3] - 3);
+      doc.text(nameText[0] || '', dx, y);
+      dx += detailColWidths[3];
+      doc.text(formatAmount(memo.amount), dx, y);
+      y += rowH;
+    });
     
-    doc.text(formatAmount(memo.amount), x, y);
-    x += colWidths[4];
-    
-    doc.text(memo.memo_sent_date ? formatDate(memo.memo_sent_date) : '', x, y);
-    x += colWidths[5];
-    
-    doc.text(String(memo.reminder_count), x, y);
-    x += colWidths[6];
-    
-    doc.text(memo.last_reminder_date ? formatDate(memo.last_reminder_date) : '', x, y);
-    x += colWidths[7];
-    
-    // Calculate days overdue from last reminder
-    let daysOverdue = 0;
-    if (memo.last_reminder_date) {
-      const lastReminder = new Date(memo.last_reminder_date);
-      daysOverdue = Math.floor((today.getTime() - lastReminder.getTime()) / (1000 * 60 * 60 * 24));
-    }
-    doc.text(String(daysOverdue), x, y);
-    
-    y += rowHeight;
+    y += 5;
   });
-  
-  // Footer with signature
-  y += 15;
-  if (y > 180) {
+
+  // === SIGNATURE BLOCK ===
+  y += 10;
+  if (y > 260) {
     doc.addPage();
     y = 40;
   }
-  doc.setFontSize(9);
-  doc.text('To', 10, y);
-  y += 5;
-  doc.text('The Superintendent of Post Offices,', 10, y);
-  y += 5;
-  doc.text(`${config.division}`, 10, y);
   
-  doc.text('Sub Postmaster', 280, y - 10, { align: 'right' });
-  doc.text(`${config.officeName} S.O`, 280, y - 5, { align: 'right' });
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Thanking you,', margin + 5, y);
+  y += 5;
+  doc.text('Yours faithfully,', margin + 5, y);
+  
+  y += 15;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sub Postmaster', pageWidth - margin, y, { align: 'right' });
+  y += 5;
+  doc.text(`${config.officeName}`, pageWidth - margin, y, { align: 'right' });
   
   return doc;
 };
