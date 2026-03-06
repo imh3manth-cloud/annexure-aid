@@ -826,7 +826,8 @@ export const generateMemosFromHFTI = async (
     balanceByAccount.set(normalized, r);
   }
   
-  const newMemos: any[] = [];
+  // First collect all new memo data (without serial yet)
+  const pendingMemos: any[] = [];
   
   for (const txn of eligibleTransactions) {
     const memoKey = `${txn.txn_id}|${txn.account}`;
@@ -841,11 +842,8 @@ export const generateMemosFromHFTI = async (
     
     const bo = detectBOFromConfig(txn.particulars);
     
-    lastSerial++;
-    
-    newMemos.push({
+    pendingMemos.push({
       user_id: userId,
-      serial: lastSerial,
       memo_key: memoKey,
       account: txn.account,
       txn_id: txn.txn_id,
@@ -870,6 +868,25 @@ export const generateMemosFromHFTI = async (
     existingKeys.add(memoKey);
     created++;
   }
+  
+  // Sort by BO name first, then account number, then transaction date
+  // This ensures same-BO and same-account memos get consecutive serial numbers
+  pendingMemos.sort((a, b) => {
+    // Primary: BO name ascending
+    const boCompare = (a.bo_name || '').localeCompare(b.bo_name || '');
+    if (boCompare !== 0) return boCompare;
+    // Secondary: Account number ascending
+    const accCompare = (a.account || '').localeCompare(b.account || '');
+    if (accCompare !== 0) return accCompare;
+    // Tertiary: Transaction date ascending
+    return (a.txn_date || '').localeCompare(b.txn_date || '');
+  });
+  
+  // Now assign serial numbers in sorted order
+  const newMemos = pendingMemos.map(memo => {
+    lastSerial++;
+    return { ...memo, serial: lastSerial };
+  });
   
   if (newMemos.length > 0) {
     await supabase.from('memos').insert(newMemos);
