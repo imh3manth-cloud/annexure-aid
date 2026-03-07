@@ -363,6 +363,47 @@ export const Reports = () => {
         </CardContent>
       </Card>
 
+      {/* Monthly Report Card */}
+      <Card className="border-accent/50 bg-accent/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-accent-foreground" />
+            Monthly Report to Divisional Office
+          </CardTitle>
+          <CardDescription>
+            Prefilled letter with BO-wise summary and memo details for the selected month
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <Label>Select Month</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(m => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={generateMonthlyReport} className="gap-2" variant="secondary">
+              <FileText className="w-4 h-4" />
+              Generate Monthly Report
+            </Button>
+          </div>
+          
+          <p className="text-xs text-muted-foreground">
+            Generates a prefilled formal letter addressed to the Superintendent of Post Offices with 
+            complete summary statistics, BO-wise consolidated table, and detailed memo listing for the month.
+          </p>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
