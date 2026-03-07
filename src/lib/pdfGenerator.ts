@@ -1024,12 +1024,13 @@ export const generateQuarterlyReportPDF = (
   
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  let y = 30;
+  let y = 25;
+  doc.text('From,', 20, y);
+  y = writeAddress(doc, config.subOfficeAddress || { name: 'The Sub Postmaster', line1: config.officeName, line2: config.subdivision, city: '', pincode: '' }, 15, y + 5);
+
+  y += 8;
   doc.text('To,', 20, y);
-  y += 6;
-  doc.text('The Superintendent of Post Offices,', 20, y);
-  y += 6;
-  doc.text(`${config.division}`, 20, y);
+  y = writeAddress(doc, config.spoOfficeAddress || { name: 'The Superintendent of Post Offices', line1: config.division, line2: '', city: '', pincode: '' }, 15, y + 5);
   
   // Subject
   y += 12;
