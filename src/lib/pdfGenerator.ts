@@ -1,7 +1,21 @@
 import jsPDF from 'jspdf';
 import { MemoRecord } from './db';
-import { getConfig } from './config';
+import { getConfig, type OfficeAddress } from './config';
 import { getPdfConfig, PdfFormatConfig } from './pdfConfig';
+
+// Write a full address block in PDF and return new Y position
+const writeAddress = (doc: jsPDF, addr: OfficeAddress, x: number, y: number, indent: number = 5): number => {
+  doc.text(addr.name + ',', x + indent, y);
+  y += 5;
+  doc.text(addr.line1 + ',', x + indent, y);
+  y += 5;
+  if (addr.line2) {
+    doc.text(addr.line2 + ',', x + indent, y);
+    y += 5;
+  }
+  doc.text(`${addr.city} - ${addr.pincode}`, x + indent, y);
+  return y;
+};
 
 // Format date as DD/MM/YYYY
 const formatDate = (dateStr: string): string => {
