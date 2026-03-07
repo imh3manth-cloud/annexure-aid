@@ -4,7 +4,7 @@ import { db, MemoRecord } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileText, Calendar, ArrowLeft } from 'lucide-react';
+import { Download, FileText, Calendar, ArrowLeft, CalendarDays } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import * as XLSX from 'xlsx';
@@ -77,14 +77,35 @@ export const Reports = () => {
     }
   });
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
   const quarterOptions = getQuarterOptions();
   const { toast } = useToast();
 
+  // Generate month options (last 12 months)
+  const getMonthOptions = () => {
+    const options: { value: string; label: string; month: number; year: number }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      options.push({
+        value: `${d.getFullYear()}-${d.getMonth()}`,
+        label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
+        month: d.getMonth(),
+        year: d.getFullYear()
+      });
+    }
+    return options;
+  };
+  const monthOptions = getMonthOptions();
+
   useEffect(() => {
     loadStats();
-    // Set default quarter to previous quarter
     if (quarterOptions.length > 1) {
       setSelectedQuarter(quarterOptions[1].value);
+    }
+    if (monthOptions.length > 1) {
+      setSelectedMonth(monthOptions[1].value);
     }
   }, []);
 
@@ -210,6 +231,33 @@ export const Reports = () => {
     }
   };
 
+  const generateMonthlyReport = async () => {
+    if (!selectedMonth) {
+      toast({ title: 'Please select a month', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const monthOpt = monthOptions.find(m => m.value === selectedMonth);
+      if (!monthOpt) return;
+
+      const memos = await db.memos.toArray();
+      
+      const { generateMonthlyReportPDF } = await import('@/lib/pdfGenerator');
+      const doc = generateMonthlyReportPDF(memos, monthOpt.month, monthOpt.year);
+      
+      const filename = `monthly_report_${monthOpt.label.replace(/\s+/g, '_')}.pdf`;
+      doc.save(filename);
+      
+      toast({ 
+        title: 'Monthly Report Generated', 
+        description: `Report for ${monthOpt.label} ready for submission` 
+      });
+    } catch (error: any) {
+      toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const exportBackup = async () => {
     try {
       const memos = await db.memos.toArray();
@@ -311,6 +359,47 @@ export const Reports = () => {
           <p className="text-xs text-muted-foreground">
             This report certifies that verification of Rs.10,000/- and above withdrawals at Branch Offices 
             has been completed for the selected quarter.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Monthly Report Card */}
+      <Card className="border-accent/50 bg-accent/5">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarDays className="w-5 h-5 text-accent-foreground" />
+            Monthly Report to Divisional Office
+          </CardTitle>
+          <CardDescription>
+            Prefilled letter with BO-wise summary and memo details for the selected month
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <Label>Select Month</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(m => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={generateMonthlyReport} className="gap-2" variant="secondary">
+              <FileText className="w-4 h-4" />
+              Generate Monthly Report
+            </Button>
+          </div>
+          
+          <p className="text-xs text-muted-foreground">
+            Generates a prefilled formal letter addressed to the Superintendent of Post Offices with 
+            complete summary statistics, BO-wise consolidated table, and detailed memo listing for the month.
           </p>
         </CardContent>
       </Card>
