@@ -785,19 +785,11 @@ export const generateOverdueReportPDF = (memos: MemoRecord[]): jsPDF => {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text('From,', margin, y);
-  y += 5;
-  doc.text(`The Sub Postmaster,`, margin + 5, y);
-  y += 5;
-  doc.text(`${config.officeName}`, margin + 5, y);
-  y += 5;
-  doc.text(`${config.subdivision}`, margin + 5, y);
+  y = writeAddress(doc, config.subOfficeAddress || { name: 'The Sub Postmaster', line1: config.officeName, line2: config.subdivision, city: '', pincode: '' }, margin, y + 5);
 
   y += 8;
   doc.text('To,', margin, y);
-  y += 5;
-  doc.text('The Superintendent of Post Offices,', margin + 5, y);
-  y += 5;
-  doc.text(`${config.division}`, margin + 5, y);
+  y = writeAddress(doc, config.spoOfficeAddress || { name: 'The Superintendent of Post Offices', line1: config.division, line2: '', city: '', pincode: '' }, margin, y + 5);
   
   // Date on right
   doc.text(`Date: ${dateStr}`, pageWidth - margin, y, { align: 'right' });
