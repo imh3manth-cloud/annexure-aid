@@ -231,6 +231,33 @@ export const Reports = () => {
     }
   };
 
+  const generateMonthlyReport = async () => {
+    if (!selectedMonth) {
+      toast({ title: 'Please select a month', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const monthOpt = monthOptions.find(m => m.value === selectedMonth);
+      if (!monthOpt) return;
+
+      const memos = await db.memos.toArray();
+      
+      const { generateMonthlyReportPDF } = await import('@/lib/pdfGenerator');
+      const doc = generateMonthlyReportPDF(memos, monthOpt.month, monthOpt.year);
+      
+      const filename = `monthly_report_${monthOpt.label.replace(/\s+/g, '_')}.pdf`;
+      doc.save(filename);
+      
+      toast({ 
+        title: 'Monthly Report Generated', 
+        description: `Report for ${monthOpt.label} ready for submission` 
+      });
+    } catch (error: any) {
+      toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const exportBackup = async () => {
     try {
       const memos = await db.memos.toArray();
