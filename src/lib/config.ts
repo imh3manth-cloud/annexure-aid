@@ -52,6 +52,7 @@ const DEFAULT_CONFIG: AppConfig = {
   }
 };
 
+export type { AppConfig, OfficeAddress };
 export { DEFAULT_CONFIG };
 
 export const getConfig = (): AppConfig => {

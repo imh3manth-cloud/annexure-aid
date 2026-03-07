@@ -9,7 +9,7 @@ import { db } from '@/lib/db';
 import { supabase } from '@/integrations/supabase/client';
 import { Download, Upload, Trash2, Save, RotateCcw } from 'lucide-react';
 
-import { getConfig, type AppConfig, type OfficeAddress } from '@/lib/config';
+import { getConfig, DEFAULT_CONFIG, type AppConfig, type OfficeAddress } from '@/lib/config';
 
 const DEFAULT_ADDRESS: OfficeAddress = {
   name: '',
