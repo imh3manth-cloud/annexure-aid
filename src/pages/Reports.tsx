@@ -77,14 +77,35 @@ export const Reports = () => {
     }
   });
   const [selectedQuarter, setSelectedQuarter] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
   const quarterOptions = getQuarterOptions();
   const { toast } = useToast();
 
+  // Generate month options (last 12 months)
+  const getMonthOptions = () => {
+    const options: { value: string; label: string; month: number; year: number }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      options.push({
+        value: `${d.getFullYear()}-${d.getMonth()}`,
+        label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
+        month: d.getMonth(),
+        year: d.getFullYear()
+      });
+    }
+    return options;
+  };
+  const monthOptions = getMonthOptions();
+
   useEffect(() => {
     loadStats();
-    // Set default quarter to previous quarter
     if (quarterOptions.length > 1) {
       setSelectedQuarter(quarterOptions[1].value);
+    }
+    if (monthOptions.length > 1) {
+      setSelectedMonth(monthOptions[1].value);
     }
   }, []);
 
