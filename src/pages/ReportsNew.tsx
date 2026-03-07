@@ -145,12 +145,71 @@ export const ReportsNew = () => {
     toast({ title: 'PDF export successful' });
   };
 
+  const generateMonthlyReport = async () => {
+    if (!selectedMonth) {
+      toast({ title: 'Please select a month', variant: 'destructive' });
+      return;
+    }
+    try {
+      const monthOpt = monthOptions.find(m => m.value === selectedMonth);
+      if (!monthOpt) return;
+      const memos = await db.memos.toArray();
+      const { generateMonthlyReportPDF } = await import('@/lib/pdfGenerator');
+      const doc = generateMonthlyReportPDF(memos, monthOpt.month, monthOpt.year);
+      doc.save(`monthly_report_${monthOpt.label.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: 'Monthly Report Generated', description: `Report for ${monthOpt.label} ready` });
+    } catch (error: any) {
+      toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h2 className="text-3xl font-bold text-foreground">Reports & Analytics</h2>
         <p className="text-muted-foreground mt-1">Generate detailed reports and export data</p>
       </div>
+
+      {/* Monthly Report Card */}
+      <Card className="relative overflow-hidden shadow-xl border-accent/10">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-primary to-accent" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-accent/10">
+              <CalendarDays className="h-5 w-5 text-accent-foreground" />
+            </div>
+            Monthly Report to Divisional Office
+          </CardTitle>
+          <CardDescription>
+            Prefilled letter with BO-wise summary and memo details for the selected month
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <Label>Select Month</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map(m => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={generateMonthlyReport} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Generate Monthly Report
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Generates a prefilled formal letter addressed to the Superintendent of Post Offices with 
+            summary statistics, BO-wise consolidated table, and detailed memo listing.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Report Configuration */}
       <Card className="relative overflow-hidden shadow-xl border-primary/10">
