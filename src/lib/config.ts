@@ -1,8 +1,19 @@
+interface OfficeAddress {
+  name: string;
+  line1: string;
+  line2: string;
+  city: string;
+  pincode: string;
+}
+
 interface AppConfig {
   officeName: string;
   subdivision: string;
   division: string;
   boMappings: Record<string, string>;
+  subOfficeAddress: OfficeAddress;
+  ipOfficeAddress: OfficeAddress;
+  spoOfficeAddress: OfficeAddress;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -17,8 +28,31 @@ const DEFAULT_CONFIG: AppConfig = {
     '5': 'Somanathapura BO',
     '6': 'Ukkalagere BO',
     '7': 'Vyasarajapura BO'
+  },
+  subOfficeAddress: {
+    name: 'The Sub Postmaster',
+    line1: 'Old Sosale S.O',
+    line2: 'T Narasipura Taluk, Mysore District',
+    city: 'Old Sosale',
+    pincode: '571124'
+  },
+  ipOfficeAddress: {
+    name: 'The Inspector of Posts',
+    line1: 'T Narasipura Sub Division',
+    line2: 'Mysore Division',
+    city: 'T Narasipura',
+    pincode: '571124'
+  },
+  spoOfficeAddress: {
+    name: 'The Superintendent of Post Offices',
+    line1: 'Mysore Division',
+    line2: 'Mysore Head Post Office',
+    city: 'Mysore',
+    pincode: '570001'
   }
 };
+
+export type { AppConfig, OfficeAddress };
 
 export const getConfig = (): AppConfig => {
   const saved = localStorage.getItem('appConfig');

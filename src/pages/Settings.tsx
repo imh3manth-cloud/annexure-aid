@@ -9,26 +9,14 @@ import { db } from '@/lib/db';
 import { supabase } from '@/integrations/supabase/client';
 import { Download, Upload, Trash2, Save, RotateCcw } from 'lucide-react';
 
-interface AppConfig {
-  officeName: string;
-  subdivision: string;
-  division: string;
-  boMappings: Record<string, string>;
-}
+import { getConfig, type AppConfig, type OfficeAddress } from '@/lib/config';
 
-const DEFAULT_CONFIG: AppConfig = {
-  officeName: 'OLD SOSALE S.O',
-  subdivision: 'T NARASIPURA SUB DIVISION',
-  division: 'MYSORE DIVISION',
-  boMappings: {
-    '1': 'Chiduravalli BO',
-    '2': 'Doddebagilu BO',
-    '3': 'Horalahalli BO',
-    '4': 'Kolathur BO',
-    '5': 'Somanathapura BO',
-    '6': 'Ukkalagere BO',
-    '7': 'Vyasarajapura BO'
-  }
+const DEFAULT_ADDRESS: OfficeAddress = {
+  name: '',
+  line1: '',
+  line2: '',
+  city: '',
+  pincode: ''
 };
 
 export const Settings = () => {
