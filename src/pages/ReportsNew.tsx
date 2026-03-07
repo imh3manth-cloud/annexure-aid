@@ -6,12 +6,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, FileText, Calendar, Building2, TrendingUp } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Calendar, CalendarDays, Building2, TrendingUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
 
 type ReportType = 'all' | 'aging' | 'branch' | 'date' | 'status';
 type ExportFormat = 'excel' | 'pdf';
+
+// Generate month options (last 12 months)
+const getMonthOptions = () => {
+  const options: { value: string; label: string; month: number; year: number }[] = [];
+  const now = new Date();
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    options.push({
+      value: `${d.getFullYear()}-${d.getMonth()}`,
+      label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
+      month: d.getMonth(),
+      year: d.getFullYear()
+    });
+  }
+  return options;
+};
 
 export const ReportsNew = () => {
   const [reportType, setReportType] = useState<ReportType>('all');
@@ -23,7 +40,9 @@ export const ReportsNew = () => {
   const [agingDays, setAgingDays] = useState('30');
   const [reportData, setReportData] = useState<MemoRecord[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>(getMonthOptions()[1]?.value || '');
   const { toast } = useToast();
+  const monthOptions = getMonthOptions();
 
   const generateReport = async () => {
     setIsGenerating(true);
