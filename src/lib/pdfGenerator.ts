@@ -1141,3 +1141,260 @@ export const generateQuarterlyReportPDF = (
   
   return doc;
 };
+
+// Generate monthly report PDF with prefilled letter to divisional office
+export const generateMonthlyReportPDF = (
+  memos: MemoRecord[],
+  month: number, // 0-11
+  year: number
+): jsPDF => {
+  const config = getConfig();
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4'
+  });
+  
+  const pageWidth = 210;
+  const margin = 15;
+  const contentWidth = pageWidth - 2 * margin;
+  const today = new Date();
+  const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+  
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthName = monthNames[month];
+  
+  // Filter memos for the selected month
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0, 23, 59, 59);
+  
+  const monthMemos = memos.filter(m => {
+    const txnDate = new Date(m.txn_date);
+    return txnDate >= monthStart && txnDate <= monthEnd;
+  });
+  
+  const verified = monthMemos.filter(m => m.status === 'Verified');
+  const pending = monthMemos.filter(m => m.status === 'Pending');
+  const reported = monthMemos.filter(m => m.status === 'Reported');
+  
+  let y = 15;
+
+  // === LETTER HEADER ===
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Department of Posts, India', pageWidth / 2, y, { align: 'center' });
+  
+  y += 10;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text('From,', margin, y);
+  y = writeAddress(doc, config.subOfficeAddress || { name: 'The Sub Postmaster', line1: config.officeName, line2: config.subdivision, city: '', pincode: '' }, margin, y + 5);
+
+  y += 8;
+  doc.text('To,', margin, y);
+  y = writeAddress(doc, config.spoOfficeAddress || { name: 'The Superintendent of Post Offices', line1: config.division, line2: '', city: '', pincode: '' }, margin, y + 5);
+  
+  // Date on right
+  doc.text(`Date: ${dateStr}`, pageWidth - margin, y, { align: 'right' });
+  
+  // Subject
+  y += 10;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(`Sub: Monthly Report on High Value Withdrawal Verification Memos`, margin, y);
+  y += 6;
+  doc.text(`       for the month of ${monthName} ${year} - Reg.`, margin, y);
+  
+  // Letter body
+  y += 10;
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('Sir/Madam,', margin + 5, y);
+  y += 7;
+  const bodyText = `With reference to the above subject, it is respectfully submitted that the following is the monthly report on High Value Withdrawal Verification Memos (ANNEXURE-4) issued from this office for the month of ${monthName} ${year}. The details are furnished below for your kind information and records.`;
+  const bodyLines = doc.splitTextToSize(bodyText, contentWidth - 10);
+  doc.text(bodyLines, margin + 5, y);
+  y += bodyLines.length * 5 + 5;
+
+  // === SUMMARY TABLE ===
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('I. Summary:', margin, y);
+  y += 7;
+  
+  const totalAmount = monthMemos.reduce((sum, m) => sum + m.amount, 0);
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  const summaryRows = [
+    ['Total Memos Issued', String(monthMemos.length), `₹${formatAmount(totalAmount)}`],
+    ['Verified', String(verified.length), `₹${formatAmount(verified.reduce((s, m) => s + m.amount, 0))}`],
+    ['Pending Verification', String(pending.length), `₹${formatAmount(pending.reduce((s, m) => s + m.amount, 0))}`],
+    ['Reported to SP', String(reported.length), `₹${formatAmount(reported.reduce((s, m) => s + m.amount, 0))}`],
+  ];
+  
+  // Summary table header
+  const sColWidths = [80, 30, 50];
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  const shH = 7;
+  doc.rect(margin, y - 4, contentWidth, shH);
+  doc.text('Particulars', margin + 2, y);
+  doc.text('Count', margin + sColWidths[0] + 2, y);
+  doc.text('Amount', margin + sColWidths[0] + sColWidths[1] + 2, y);
+  y += shH - 1;
+  
+  doc.setFont('helvetica', 'normal');
+  summaryRows.forEach(([label, count, amount]) => {
+    const rH = 6;
+    doc.rect(margin, y - 3.5, contentWidth, rH);
+    doc.text(label, margin + 2, y);
+    doc.text(count, margin + sColWidths[0] + 2, y);
+    doc.text(amount, margin + sColWidths[0] + sColWidths[1] + 2, y);
+    y += rH;
+  });
+  y += 8;
+
+  // === SECTION 2: BO-WISE CONSOLIDATED SUMMARY ===
+  if (y > 240) { doc.addPage(); y = 15; }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('II. Branch Office wise Summary:', margin, y);
+  y += 7;
+  
+  // Group memos by BO
+  const boGroups: Record<string, MemoRecord[]> = {};
+  monthMemos.forEach(memo => {
+    const bo = memo.BO_Name || 'Unknown';
+    if (!boGroups[bo]) boGroups[bo] = [];
+    boGroups[bo].push(memo);
+  });
+  
+  const boNames = Object.keys(boGroups).sort();
+  
+  const bColWidths = [15, 70, 30, 45];
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'bold');
+  
+  const bhH = 7;
+  doc.rect(margin, y - 4, contentWidth, bhH);
+  let bx = margin + 2;
+  doc.text('Sl.', bx, y);
+  bx += bColWidths[0];
+  doc.text('Branch Office', bx, y);
+  bx += bColWidths[1];
+  doc.text('No. of Memos', bx, y);
+  bx += bColWidths[2];
+  doc.text('Total Amount (₹)', bx, y);
+  y += bhH - 1;
+  
+  doc.setFont('helvetica', 'normal');
+  let grandTotal = 0;
+  let grandCount = 0;
+  
+  boNames.forEach((bo, idx) => {
+    const group = boGroups[bo];
+    const boAmount = group.reduce((sum, m) => sum + m.amount, 0);
+    grandTotal += boAmount;
+    grandCount += group.length;
+    
+    const rH = 6;
+    doc.rect(margin, y - 3.5, contentWidth, rH);
+    bx = margin + 2;
+    doc.text(String(idx + 1), bx, y);
+    bx += bColWidths[0];
+    doc.text(bo, bx, y);
+    bx += bColWidths[1];
+    doc.text(String(group.length), bx, y);
+    bx += bColWidths[2];
+    doc.text(formatAmount(boAmount), bx, y);
+    y += rH;
+  });
+  
+  // Grand total
+  const gtH = 7;
+  doc.setFont('helvetica', 'bold');
+  doc.rect(margin, y - 3.5, contentWidth, gtH);
+  bx = margin + 2 + bColWidths[0];
+  doc.text('GRAND TOTAL', bx, y);
+  bx += bColWidths[1];
+  doc.text(String(grandCount), bx, y);
+  bx += bColWidths[2];
+  doc.text(formatAmount(grandTotal), bx, y);
+  y += gtH + 8;
+
+  // === SECTION 3: BO-WISE DETAILED TABLE ===
+  if (y > 240) { doc.addPage(); y = 15; }
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('III. Branch Office wise Memo Details:', margin, y);
+  y += 7;
+  
+  const detailColWidths = [18, 28, 25, 55, 30];
+  const detailHeaders = ['Memo No.', 'Account No.', 'Date', 'Depositor Name', 'Amount (₹)'];
+  
+  boNames.forEach((bo) => {
+    const group = boGroups[bo];
+    const boTotal = group.reduce((sum, m) => sum + m.amount, 0);
+    
+    if (y > 255) { doc.addPage(); y = 15; }
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${bo} (${group.length} memos, ₹${formatAmount(boTotal)})`, margin, y);
+    y += 5;
+    
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'bold');
+    const thH = 6;
+    doc.rect(margin, y - 3.5, contentWidth, thH);
+    let dx = margin + 1;
+    detailHeaders.forEach((h, i) => {
+      doc.text(h, dx, y);
+      dx += detailColWidths[i];
+    });
+    y += thH;
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    
+    group.sort((a, b) => a.serial - b.serial).forEach((memo) => {
+      if (y > 280) { doc.addPage(); y = 15; }
+      
+      const rowH = 5.5;
+      doc.rect(margin, y - 3.5, contentWidth, rowH);
+      dx = margin + 1;
+      doc.text(String(memo.serial), dx, y);
+      dx += detailColWidths[0];
+      doc.text(memo.account, dx, y);
+      dx += detailColWidths[1];
+      doc.text(formatDate(memo.txn_date), dx, y);
+      dx += detailColWidths[2];
+      const nameText = doc.splitTextToSize(memo.name || '', detailColWidths[3] - 3);
+      doc.text(nameText[0] || '', dx, y);
+      dx += detailColWidths[3];
+      doc.text(formatAmount(memo.amount), dx, y);
+      y += rowH;
+    });
+    
+    y += 5;
+  });
+
+  // === SIGNATURE BLOCK ===
+  y += 10;
+  if (y > 260) { doc.addPage(); y = 40; }
+  
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Thanking you,', margin + 5, y);
+  y += 5;
+  doc.text('Yours faithfully,', margin + 5, y);
+  
+  y += 15;
+  doc.setFont('helvetica', 'bold');
+  doc.text('Sub Postmaster', pageWidth - margin, y, { align: 'right' });
+  y += 5;
+  doc.text(`${config.officeName}`, pageWidth - margin, y, { align: 'right' });
+  
+  return doc;
+};
