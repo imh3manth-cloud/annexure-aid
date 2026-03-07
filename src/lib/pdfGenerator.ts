@@ -560,19 +560,11 @@ export const generateReminderPDF = (memos: MemoRecord[]): jsPDF => {
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text('From,', margin, y);
-  y += 5;
-  doc.text(`The Sub Postmaster,`, margin + 5, y);
-  y += 5;
-  doc.text(`${config.officeName}`, margin + 5, y);
-  y += 5;
-  doc.text(`${config.subdivision}`, margin + 5, y);
+  y = writeAddress(doc, config.subOfficeAddress || { name: 'The Sub Postmaster', line1: config.officeName, line2: config.subdivision, city: '', pincode: '' }, margin, y + 5);
 
   y += 8;
   doc.text('To,', margin, y);
-  y += 5;
-  doc.text('The Inspector of Posts,', margin + 5, y);
-  y += 5;
-  doc.text(`${config.subdivision}`, margin + 5, y);
+  y = writeAddress(doc, config.ipOfficeAddress || { name: 'The Inspector of Posts', line1: config.subdivision, line2: '', city: '', pincode: '' }, margin, y + 5);
   
   // Date on right
   const today = new Date();
