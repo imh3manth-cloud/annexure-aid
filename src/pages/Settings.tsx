@@ -296,6 +296,107 @@ export const Settings = () => {
         </CardContent>
       </Card>
 
+      {/* Office Addresses */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Office Addresses</CardTitle>
+          <CardDescription>Full addresses used in official letters (reminders, reports to SP/IP)</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Sub Office Address */}
+          <div className="space-y-3 p-4 border rounded-lg">
+            <h4 className="font-semibold text-sm">Sub Office (Your Office)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Designation</Label>
+                <Input value={config.subOfficeAddress?.name || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), name: e.target.value } })} placeholder="e.g., The Sub Postmaster" />
+              </div>
+              <div className="space-y-1">
+                <Label>Office / Line 1</Label>
+                <Input value={config.subOfficeAddress?.line1 || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), line1: e.target.value } })} placeholder="e.g., Old Sosale S.O" />
+              </div>
+              <div className="space-y-1">
+                <Label>Line 2</Label>
+                <Input value={config.subOfficeAddress?.line2 || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), line2: e.target.value } })} placeholder="e.g., T Narasipura Taluk" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label>City</Label>
+                  <Input value={config.subOfficeAddress?.city || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), city: e.target.value } })} placeholder="City" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Pincode</Label>
+                  <Input value={config.subOfficeAddress?.pincode || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), pincode: e.target.value } })} placeholder="570001" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* IP Office Address */}
+          <div className="space-y-3 p-4 border rounded-lg">
+            <h4 className="font-semibold text-sm">Inspector of Posts Office</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Designation</Label>
+                <Input value={config.ipOfficeAddress?.name || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), name: e.target.value } })} placeholder="e.g., The Inspector of Posts" />
+              </div>
+              <div className="space-y-1">
+                <Label>Office / Line 1</Label>
+                <Input value={config.ipOfficeAddress?.line1 || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), line1: e.target.value } })} placeholder="e.g., T Narasipura Sub Division" />
+              </div>
+              <div className="space-y-1">
+                <Label>Line 2</Label>
+                <Input value={config.ipOfficeAddress?.line2 || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), line2: e.target.value } })} placeholder="e.g., Mysore Division" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label>City</Label>
+                  <Input value={config.ipOfficeAddress?.city || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), city: e.target.value } })} placeholder="City" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Pincode</Label>
+                  <Input value={config.ipOfficeAddress?.pincode || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), pincode: e.target.value } })} placeholder="570001" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* SPOs Office Address */}
+          <div className="space-y-3 p-4 border rounded-lg">
+            <h4 className="font-semibold text-sm">Superintendent of Post Offices</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Designation</Label>
+                <Input value={config.spoOfficeAddress?.name || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), name: e.target.value } })} placeholder="e.g., The Superintendent of Post Offices" />
+              </div>
+              <div className="space-y-1">
+                <Label>Office / Line 1</Label>
+                <Input value={config.spoOfficeAddress?.line1 || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), line1: e.target.value } })} placeholder="e.g., Mysore Division" />
+              </div>
+              <div className="space-y-1">
+                <Label>Line 2</Label>
+                <Input value={config.spoOfficeAddress?.line2 || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), line2: e.target.value } })} placeholder="e.g., Mysore Head Post Office" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label>City</Label>
+                  <Input value={config.spoOfficeAddress?.city || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), city: e.target.value } })} placeholder="City" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Pincode</Label>
+                  <Input value={config.spoOfficeAddress?.pincode || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), pincode: e.target.value } })} placeholder="570001" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <Button onClick={handleSave}>
+            <Save className="w-4 h-4 mr-2" />
+            Save Addresses
+          </Button>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Reminder Management</CardTitle>
