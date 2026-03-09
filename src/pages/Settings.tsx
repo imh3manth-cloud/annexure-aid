@@ -4,29 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { db } from '@/lib/db';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, Upload, Trash2, Save, RotateCcw } from 'lucide-react';
-
+import { Download, Upload, Trash2, Save, RotateCcw, Building2, Pencil, MapPin } from 'lucide-react';
 import { getConfig, DEFAULT_CONFIG, type AppConfig, type OfficeAddress } from '@/lib/config';
+import { AddressCardDialog } from '@/components/AddressCardDialog';
 
-const DEFAULT_ADDRESS: OfficeAddress = {
-  name: '',
-  line1: '',
-  line2: '',
-  city: '',
-  pincode: ''
-};
+const DEFAULT_ADDRESS: OfficeAddress = { name: '', line1: '', line2: '', city: '', pincode: '' };
 
 export const Settings = () => {
   const [config, setConfig] = useState<AppConfig>(DEFAULT_CONFIG);
   const [boMappingsText, setBoMappingsText] = useState('');
+  const [officeDialogOpen, setOfficeDialogOpen] = useState(false);
+  const [boDialogOpen, setBoDialogOpen] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadConfig();
-  }, []);
+  useEffect(() => { loadConfig(); }, []);
 
   const loadConfig = () => {
     const saved = localStorage.getItem('appConfig');
@@ -49,50 +44,48 @@ export const Settings = () => {
     }
   };
 
-  const formatBOMappings = (mappings: Record<string, string>) => {
-    return Object.entries(mappings)
-      .map(([code, name]) => `BO2130911100${code}=${name}`)
-      .join('\n');
-  };
+  const formatBOMappings = (mappings: Record<string, string>) =>
+    Object.entries(mappings).map(([code, name]) => `BO2130911100${code}=${name}`).join('\n');
 
   const parseBOMappings = (text: string): Record<string, string> => {
     const mappings: Record<string, string> = {};
     text.split('\n').forEach(line => {
       const [code, name] = line.split('=').map(s => s.trim());
       if (code && name) {
-        // Extract just the last digit if full BO code provided (e.g., BO21309111001 -> 1)
         const match = code.match(/BO\d+(\d)$/);
-        const key = match ? match[1] : code;
-        mappings[key] = name;
+        mappings[match ? match[1] : code] = name;
       }
     });
     return mappings;
   };
 
-  const handleSave = () => {
-    const updatedConfig = {
-      ...config,
-      boMappings: parseBOMappings(boMappingsText)
-    };
-    localStorage.setItem('appConfig', JSON.stringify(updatedConfig));
-    setConfig(updatedConfig);
-    // Dispatch custom event to notify other components
+  const saveConfig = (updated: AppConfig) => {
+    const final = { ...updated, boMappings: parseBOMappings(boMappingsText) };
+    localStorage.setItem('appConfig', JSON.stringify(final));
+    setConfig(final);
     window.dispatchEvent(new Event('configUpdated'));
     toast({ title: 'Settings saved successfully' });
+  };
+
+  const handleSave = () => saveConfig(config);
+
+  const handleAddressSave = (key: 'subOfficeAddress' | 'ipOfficeAddress' | 'spoOfficeAddress', addr: OfficeAddress) => {
+    const updated = { ...config, [key]: addr };
+    setConfig(updated);
+    saveConfig(updated);
+  };
+
+  const handleAddressClear = (key: 'subOfficeAddress' | 'ipOfficeAddress' | 'spoOfficeAddress') => {
+    const updated = { ...config, [key]: DEFAULT_ADDRESS };
+    setConfig(updated);
+    saveConfig(updated);
   };
 
   const handleBackup = async () => {
     try {
       const memos = await db.memos.toArray();
       const settings = await db.settings.toArray();
-      const backup = {
-        version: 1,
-        timestamp: new Date().toISOString(),
-        config,
-        memos,
-        settings
-      };
-
+      const backup = { version: 1, timestamp: new Date().toISOString(), config, memos, settings };
       const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -100,7 +93,6 @@ export const Settings = () => {
       a.download = `memo-backup-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
-
       toast({ title: 'Backup created successfully' });
     } catch (error: any) {
       toast({ title: 'Backup failed', description: error.message, variant: 'destructive' });
@@ -115,51 +107,30 @@ export const Settings = () => {
       try {
         const file = e.target.files[0];
         if (!file) return;
-        
         const text = await file.text();
         let backup: any;
-        
-        try {
-          backup = JSON.parse(text);
-        } catch (parseError) {
-          toast({ 
-            title: 'Restore failed', 
-            description: 'Invalid JSON file format', 
-            variant: 'destructive' 
-          });
+        try { backup = JSON.parse(text); } catch {
+          toast({ title: 'Restore failed', description: 'Invalid JSON file format', variant: 'destructive' });
           return;
         }
-
-        // Validate backup structure
         if (!backup || typeof backup !== 'object') {
-          toast({ 
-            title: 'Restore failed', 
-            description: 'Invalid backup file format', 
-            variant: 'destructive' 
-          });
+          toast({ title: 'Restore failed', description: 'Invalid backup file format', variant: 'destructive' });
           return;
         }
-
-        // Restore config with validation
         if (backup.config && typeof backup.config === 'object') {
           const safeConfig = { ...DEFAULT_CONFIG, ...backup.config };
           localStorage.setItem('appConfig', JSON.stringify(safeConfig));
           setConfig(safeConfig);
           setBoMappingsText(formatBOMappings(safeConfig.boMappings || DEFAULT_CONFIG.boMappings));
         }
-
-        // Restore memos with validation
         if (backup.memos && Array.isArray(backup.memos)) {
           await db.memos.clear();
           await db.memos.bulkAdd(backup.memos);
         }
-
-        // Restore settings with validation
         if (backup.settings && Array.isArray(backup.settings)) {
           await db.settings.clear();
           await db.settings.bulkAdd(backup.settings);
         }
-
         toast({ title: 'Restore completed successfully' });
       } catch (error: any) {
         toast({ title: 'Restore failed', description: error.message, variant: 'destructive' });
@@ -170,7 +141,6 @@ export const Settings = () => {
 
   const handleReset = async () => {
     if (!confirm('Are you sure you want to reset all data? This cannot be undone.')) return;
-
     try {
       await db.memos.clear();
       await db.settings.clear();
@@ -185,45 +155,15 @@ export const Settings = () => {
 
   const handleResetReminders = async () => {
     if (!confirm('This will reset reminder counts and reported status on all pending/reported memos, so you can start fresh with Reminder 1 to IP. Continue?')) return;
-
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({ title: 'Not authenticated', variant: 'destructive' });
-        return;
-      }
+      if (!user) { toast({ title: 'Not authenticated', variant: 'destructive' }); return; }
 
-      // Reset reminder_count, last_reminder_date, and change Reported back to Pending
-      const { error: err1 } = await supabase
-        .from('memos')
-        .update({ 
-          reminder_count: 0, 
-          last_reminder_date: null,
-          remarks: ''
-        })
-        .eq('user_id', user.id)
-        .in('status', ['Pending', 'Reported']);
-
+      const { error: err1 } = await supabase.from('memos').update({ reminder_count: 0, last_reminder_date: null, remarks: '' }).eq('user_id', user.id).in('status', ['Pending', 'Reported']);
       if (err1) throw err1;
-
-      // Change Reported memos back to Pending
-      const { error: err2 } = await supabase
-        .from('memos')
-        .update({ 
-          status: 'Pending',
-          reported_date: null
-        })
-        .eq('user_id', user.id)
-        .eq('status', 'Reported');
-
+      const { error: err2 } = await supabase.from('memos').update({ status: 'Pending', reported_date: null }).eq('user_id', user.id).eq('status', 'Reported');
       if (err2) throw err2;
-
-      // Delete reminder history for this user
-      const { error: err3 } = await supabase
-        .from('reminder_history')
-        .delete()
-        .eq('user_id', user.id);
-
+      const { error: err3 } = await supabase.from('reminder_history').delete().eq('user_id', user.id);
       if (err3) throw err3;
 
       toast({ title: 'Reminders reset successfully. You can now generate Reminder 1 to IP.' });
@@ -232,236 +172,176 @@ export const Settings = () => {
     }
   };
 
+  const boCount = Object.keys(config.boMappings || {}).length;
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-3xl font-bold text-foreground">Settings</h2>
-        <p className="text-muted-foreground">Configure application settings and manage data</p>
+        <p className="text-muted-foreground">Configure your office details, addresses, and manage data</p>
       </div>
 
+      {/* Office Configuration - compact summary card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Office Configuration</CardTitle>
-          <CardDescription>Customize office name and subdivision details</CardDescription>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Building2 className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Office Configuration</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  {config.officeName} · {config.subdivision}
+                </CardDescription>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setOfficeDialogOpen(true)}>
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
+              Edit
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="officeName">Office Name</Label>
-            <Input
-              id="officeName"
-              value={config.officeName}
-              onChange={(e) => setConfig({ ...config, officeName: e.target.value })}
-              placeholder="e.g., OLD SOSALE S.O"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="subdivision">Subdivision (for reminders to IP)</Label>
-            <Input
-              id="subdivision"
-              value={config.subdivision}
-              onChange={(e) => setConfig({ ...config, subdivision: e.target.value })}
-              placeholder="e.g., T NARASIPURA SUB DIVISION"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="division">Division (for reports to SP)</Label>
-            <Input
-              id="division"
-              value={config.division || ''}
-              onChange={(e) => setConfig({ ...config, division: e.target.value })}
-              placeholder="e.g., MYSORE DIVISION"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="boMappings">Branch Office Code Mappings</Label>
-            <p className="text-sm text-muted-foreground">
-              Enter one mapping per line in format: BO21309111001=Branch Name
-            </p>
-            <Textarea
-              id="boMappings"
-              value={boMappingsText}
-              onChange={(e) => setBoMappingsText(e.target.value)}
-              rows={10}
-              className="font-mono text-sm"
-            />
-          </div>
-
-          <Button onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            Save Configuration
-          </Button>
-        </CardContent>
       </Card>
+
+      {/* Office Config Dialog */}
+      <Dialog open={officeDialogOpen} onOpenChange={setOfficeDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Office Configuration</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label>Office Name</Label>
+              <Input value={config.officeName} onChange={(e) => setConfig({ ...config, officeName: e.target.value })} placeholder="e.g., OLD SOSALE S.O" />
+            </div>
+            <div className="space-y-1">
+              <Label>Subdivision (for reminders to IP)</Label>
+              <Input value={config.subdivision} onChange={(e) => setConfig({ ...config, subdivision: e.target.value })} placeholder="e.g., T NARASIPURA SUB DIVISION" />
+            </div>
+            <div className="space-y-1">
+              <Label>Division (for reports to SP)</Label>
+              <Input value={config.division || ''} onChange={(e) => setConfig({ ...config, division: e.target.value })} placeholder="e.g., MYSORE DIVISION" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOfficeDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => { handleSave(); setOfficeDialogOpen(false); }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* BO Mappings - compact card */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-accent/50">
+                <MapPin className="h-5 w-5 text-accent-foreground" />
+              </div>
+              <div>
+                <CardTitle className="text-base">Branch Office Mappings</CardTitle>
+                <CardDescription className="text-xs mt-0.5">
+                  {boCount} branch office{boCount !== 1 ? 's' : ''} configured
+                </CardDescription>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => { setBoMappingsText(formatBOMappings(config.boMappings || {})); setBoDialogOpen(true); }}>
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
+              Edit
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
+      {/* BO Mappings Dialog */}
+      <Dialog open={boDialogOpen} onOpenChange={setBoDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Branch Office Code Mappings</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              One mapping per line: <code className="text-xs bg-muted px-1 py-0.5 rounded">BO21309111001=Branch Name</code>
+            </p>
+            <Textarea value={boMappingsText} onChange={(e) => setBoMappingsText(e.target.value)} rows={8} className="font-mono text-sm" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBoDialogOpen(false)}>Cancel</Button>
+            <Button onClick={() => { handleSave(); setBoDialogOpen(false); }}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Office Addresses */}
       <Card>
-        <CardHeader>
-          <CardTitle>Office Addresses</CardTitle>
-          <CardDescription>Full addresses used in official letters (reminders, reports to SP/IP)</CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Office Addresses</CardTitle>
+          <CardDescription className="text-xs">Used in official letters — hover a card and click ⋮ to edit</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Sub Office Address */}
-          <div className="space-y-3 p-4 border rounded-lg">
-            <h4 className="font-semibold text-sm">Sub Office (Your Office)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Designation</Label>
-                <Input value={config.subOfficeAddress?.name || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), name: e.target.value } })} placeholder="e.g., The Sub Postmaster" />
-              </div>
-              <div className="space-y-1">
-                <Label>Office / Line 1</Label>
-                <Input value={config.subOfficeAddress?.line1 || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), line1: e.target.value } })} placeholder="e.g., Old Sosale S.O" />
-              </div>
-              <div className="space-y-1">
-                <Label>Line 2</Label>
-                <Input value={config.subOfficeAddress?.line2 || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), line2: e.target.value } })} placeholder="e.g., T Narasipura Taluk" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>City</Label>
-                  <Input value={config.subOfficeAddress?.city || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), city: e.target.value } })} placeholder="City" />
-                </div>
-                <div className="space-y-1">
-                  <Label>Pincode</Label>
-                  <Input value={config.subOfficeAddress?.pincode || ''} onChange={(e) => setConfig({ ...config, subOfficeAddress: { ...(config.subOfficeAddress || DEFAULT_ADDRESS), pincode: e.target.value } })} placeholder="570001" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* IP Office Address */}
-          <div className="space-y-3 p-4 border rounded-lg">
-            <h4 className="font-semibold text-sm">Inspector of Posts Office</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Designation</Label>
-                <Input value={config.ipOfficeAddress?.name || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), name: e.target.value } })} placeholder="e.g., The Inspector of Posts" />
-              </div>
-              <div className="space-y-1">
-                <Label>Office / Line 1</Label>
-                <Input value={config.ipOfficeAddress?.line1 || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), line1: e.target.value } })} placeholder="e.g., T Narasipura Sub Division" />
-              </div>
-              <div className="space-y-1">
-                <Label>Line 2</Label>
-                <Input value={config.ipOfficeAddress?.line2 || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), line2: e.target.value } })} placeholder="e.g., Mysore Division" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>City</Label>
-                  <Input value={config.ipOfficeAddress?.city || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), city: e.target.value } })} placeholder="City" />
-                </div>
-                <div className="space-y-1">
-                  <Label>Pincode</Label>
-                  <Input value={config.ipOfficeAddress?.pincode || ''} onChange={(e) => setConfig({ ...config, ipOfficeAddress: { ...(config.ipOfficeAddress || DEFAULT_ADDRESS), pincode: e.target.value } })} placeholder="570001" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* SPOs Office Address */}
-          <div className="space-y-3 p-4 border rounded-lg">
-            <h4 className="font-semibold text-sm">Superintendent of Post Offices</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Designation</Label>
-                <Input value={config.spoOfficeAddress?.name || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), name: e.target.value } })} placeholder="e.g., The Superintendent of Post Offices" />
-              </div>
-              <div className="space-y-1">
-                <Label>Office / Line 1</Label>
-                <Input value={config.spoOfficeAddress?.line1 || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), line1: e.target.value } })} placeholder="e.g., Mysore Division" />
-              </div>
-              <div className="space-y-1">
-                <Label>Line 2</Label>
-                <Input value={config.spoOfficeAddress?.line2 || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), line2: e.target.value } })} placeholder="e.g., Mysore Head Post Office" />
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-1">
-                  <Label>City</Label>
-                  <Input value={config.spoOfficeAddress?.city || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), city: e.target.value } })} placeholder="City" />
-                </div>
-                <div className="space-y-1">
-                  <Label>Pincode</Label>
-                  <Input value={config.spoOfficeAddress?.pincode || ''} onChange={(e) => setConfig({ ...config, spoOfficeAddress: { ...(config.spoOfficeAddress || DEFAULT_ADDRESS), pincode: e.target.value } })} placeholder="570001" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <Button onClick={handleSave}>
-            <Save className="w-4 h-4 mr-2" />
-            Save Addresses
-          </Button>
+        <CardContent className="space-y-3 pt-0">
+          <AddressCardDialog
+            title="Sub Office (Your Office)"
+            address={config.subOfficeAddress || DEFAULT_ADDRESS}
+            onSave={(addr) => handleAddressSave('subOfficeAddress', addr)}
+            onClear={() => handleAddressClear('subOfficeAddress')}
+          />
+          <AddressCardDialog
+            title="Inspector of Posts Office"
+            address={config.ipOfficeAddress || DEFAULT_ADDRESS}
+            onSave={(addr) => handleAddressSave('ipOfficeAddress', addr)}
+            onClear={() => handleAddressClear('ipOfficeAddress')}
+          />
+          <AddressCardDialog
+            title="Superintendent of Post Offices"
+            address={config.spoOfficeAddress || DEFAULT_ADDRESS}
+            onSave={(addr) => handleAddressSave('spoOfficeAddress', addr)}
+            onClear={() => handleAddressClear('spoOfficeAddress')}
+          />
         </CardContent>
       </Card>
 
+      {/* Reminder Management */}
       <Card>
-        <CardHeader>
-          <CardTitle>Reminder Management</CardTitle>
-          <CardDescription>Reset reminder counts to start the reminder cycle fresh</CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Reminder Management</CardTitle>
+          <CardDescription className="text-xs">Reset reminder counts to start the cycle fresh</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-muted p-4 rounded-lg space-y-2">
-            <p className="text-sm text-muted-foreground">
-              If memos are incorrectly showing higher reminder numbers or are marked as &quot;Reported to SP&quot; 
-              before reminders were actually generated, use this to reset all reminders back to zero. 
-              This will allow you to start fresh with Reminder 1 to IP.
-            </p>
-            <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
-              <li>Resets reminder count to 0 on all Pending and Reported memos</li>
-              <li>Changes &quot;Reported&quot; memos back to &quot;Pending&quot; status</li>
-              <li>Clears all reminder history records</li>
-            </ul>
-          </div>
-          <Button onClick={handleResetReminders} variant="outline" className="border-amber-500 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950">
+        <CardContent className="space-y-3 pt-0">
+          <p className="text-sm text-muted-foreground">
+            Resets all Pending/Reported memos to Reminder 0 and clears history, so you can start fresh with Reminder 1 to IP.
+          </p>
+          <Button onClick={handleResetReminders} variant="outline" size="sm" className="border-amber-500/50 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950">
             <RotateCcw className="w-4 h-4 mr-2" />
             Reset All Reminders
           </Button>
         </CardContent>
       </Card>
 
+      {/* Data Management */}
       <Card>
-        <CardHeader>
-          <CardTitle>Data Management</CardTitle>
-          <CardDescription>Backup, restore, or reset your data</CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Data Management</CardTitle>
+          <CardDescription className="text-xs">Backup, restore, or reset your data</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button onClick={handleBackup} variant="outline">
+        <CardContent className="space-y-4 pt-0">
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleBackup} variant="outline" size="sm">
               <Download className="w-4 h-4 mr-2" />
-              Backup Data
+              Backup
             </Button>
-
-            <Button onClick={handleRestore} variant="outline">
+            <Button onClick={handleRestore} variant="outline" size="sm">
               <Upload className="w-4 h-4 mr-2" />
-              Restore Data
+              Restore
             </Button>
-
-            <Button onClick={handleReset} variant="destructive">
+            <Button onClick={handleReset} variant="destructive" size="sm">
               <Trash2 className="w-4 h-4 mr-2" />
-              Reset All Data
+              Reset All
             </Button>
           </div>
-
-          <div className="bg-muted p-4 rounded-lg space-y-2">
-            <h4 className="font-semibold text-sm">Offline Usage</h4>
-            <p className="text-sm text-muted-foreground">
-              This application works completely offline. All data is stored locally in your browser.
-              Use the backup feature to save your data as a JSON file, which you can share with others
-              or use on different devices.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              To use this app on another device:
-            </p>
-            <ol className="text-sm text-muted-foreground list-decimal list-inside space-y-1">
-              <li>Create a backup on this device</li>
-              <li>Open the app on the new device</li>
-              <li>Go to Settings and restore the backup file</li>
-              <li>Customize office settings if needed</li>
-            </ol>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            All data is stored locally. Use backup to transfer data between devices.
+          </p>
         </CardContent>
       </Card>
     </div>
