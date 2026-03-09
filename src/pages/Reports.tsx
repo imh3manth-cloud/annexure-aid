@@ -109,6 +109,17 @@ export const Reports = () => {
     }
   }, []);
 
+  // Refresh data when tab regains focus
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadStats();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   const loadStats = async () => {
     const memos = await db.memos.toArray();
     const pending = memos.filter(m => m.status === 'Pending');
