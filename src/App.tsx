@@ -135,6 +135,20 @@ function AppRoutes() {
           </Layout>
         </ProtectedRoute>
       } />
+      <Route path="/custom-registers" element={
+        <ProtectedRoute>
+          <Layout>
+            <CustomRegisters />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/custom-register/:id" element={
+        <ProtectedRoute>
+          <Layout>
+            <CustomRegisterView />
+          </Layout>
+        </ProtectedRoute>
+      } />
       <Route path="/settings" element={
         <ProtectedRoute>
           <Layout>
