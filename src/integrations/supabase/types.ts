@@ -44,6 +44,77 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_register_rows: {
+        Row: {
+          created_at: string | null
+          id: string
+          register_id: string
+          row_data: Json
+          row_order: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          register_id: string
+          row_data?: Json
+          row_order?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          register_id?: string
+          row_data?: Json
+          row_order?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_register_rows_register_id_fkey"
+            columns: ["register_id"]
+            isOneToOne: false
+            referencedRelation: "custom_registers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_registers: {
+        Row: {
+          columns: Json
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          presets: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          presets?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          columns?: Json
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          presets?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       despatch_records: {
         Row: {
           created_at: string | null
