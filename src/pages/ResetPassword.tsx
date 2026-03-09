@@ -32,8 +32,9 @@ export function ResetPassword() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      toast.error(passwordCheck.error || 'Password does not meet requirements');
       return;
     }
     if (password !== confirmPassword) {
