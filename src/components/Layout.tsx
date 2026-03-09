@@ -1,6 +1,6 @@
 import { NavLink } from './NavLink';
 import { ThemeSelector } from './ThemeSelector';
-import { LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, LogOut } from 'lucide-react';
+import { LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, LogOut, FileSpreadsheet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig } from '@/lib/config';
 import { useNavigate, useLocation } from 'react-router-dom';
