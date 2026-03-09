@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, FileText, Calendar, CalendarDays, Building2, TrendingUp } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, Calendar, CalendarDays, Building2, TrendingUp, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
+import { generateConsolidatedPDF, generateQuarterlyReportPDF } from '@/lib/pdfGenerator';
 
 type ReportType = 'all' | 'aging' | 'branch' | 'date' | 'status';
 type ExportFormat = 'excel' | 'pdf';
@@ -30,6 +30,44 @@ const getMonthOptions = () => {
   return options;
 };
 
+// Generate quarter options (last 4 quarters)
+const getQuarterOptions = () => {
+  const options: { value: string; label: string; startDate: Date; endDate: Date }[] = [];
+  const now = new Date();
+  
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - (i * 3), 1);
+    const month = d.getMonth();
+    
+    let qStart: Date, qEnd: Date, qLabel: string;
+    
+    if (month >= 0 && month <= 2) {
+      qStart = new Date(d.getFullYear(), 0, 1);
+      qEnd = new Date(d.getFullYear(), 2, 31);
+      qLabel = `Q4 (Jan-Mar ${d.getFullYear()})`;
+    } else if (month >= 3 && month <= 5) {
+      qStart = new Date(d.getFullYear(), 3, 1);
+      qEnd = new Date(d.getFullYear(), 5, 30);
+      qLabel = `Q1 (Apr-Jun ${d.getFullYear()})`;
+    } else if (month >= 6 && month <= 8) {
+      qStart = new Date(d.getFullYear(), 6, 1);
+      qEnd = new Date(d.getFullYear(), 8, 30);
+      qLabel = `Q2 (Jul-Sep ${d.getFullYear()})`;
+    } else {
+      qStart = new Date(d.getFullYear(), 9, 1);
+      qEnd = new Date(d.getFullYear(), 11, 31);
+      qLabel = `Q3 (Oct-Dec ${d.getFullYear()})`;
+    }
+    
+    const value = `${qStart.getFullYear()}-${qStart.getMonth()}`;
+    if (!options.find(o => o.value === value)) {
+      options.push({ value, label: qLabel, startDate: qStart, endDate: qEnd });
+    }
+  }
+  return options;
+};
+
+
 export const ReportsNew = () => {
   const [reportType, setReportType] = useState<ReportType>('all');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('excel');
@@ -41,8 +79,10 @@ export const ReportsNew = () => {
   const [reportData, setReportData] = useState<MemoRecord[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>(getMonthOptions()[1]?.value || '');
+  const [selectedQuarter, setSelectedQuarter] = useState<string>(getQuarterOptions()[0]?.value || '');
   const { toast } = useToast();
   const monthOptions = getMonthOptions();
+  const quarterOptions = getQuarterOptions();
 
   const generateReport = async () => {
     setIsGenerating(true);
@@ -207,6 +247,62 @@ export const ReportsNew = () => {
           <p className="text-xs text-muted-foreground">
             Generates a prefilled formal letter addressed to the Superintendent of Post Offices with 
             summary statistics, BO-wise consolidated table, and detailed memo listing.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Quarterly Report Card */}
+      <Card className="relative overflow-hidden shadow-xl border-primary/10">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <ClipboardList className="h-5 w-5 text-primary" />
+            </div>
+            Quarterly Report to Divisional Superintendent
+          </CardTitle>
+          <CardDescription>
+            Quarterly verification summary report as per POSB CBS Manual (due 5th of Jan, Apr, Jul, Oct)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <Label>Select Quarter</Label>
+              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select quarter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quarterOptions.map(q => (
+                    <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={async () => {
+              if (!selectedQuarter) {
+                toast({ title: 'Please select a quarter', variant: 'destructive' });
+                return;
+              }
+              try {
+                const qOpt = quarterOptions.find(q => q.value === selectedQuarter);
+                if (!qOpt) return;
+                const memos = await db.memos.toArray();
+                const doc = generateQuarterlyReportPDF(memos, qOpt.startDate, qOpt.endDate);
+                doc.save(`quarterly_report_${qOpt.label.replace(/[\s()]/g, '_')}.pdf`);
+                toast({ title: 'Quarterly Report Generated', description: `Report for ${qOpt.label} ready` });
+              } catch (error: any) {
+                toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
+              }
+            }} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Generate Quarterly Report
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Generates a formal quarterly verification report with summary statistics and BO-wise breakdown, 
+            addressed to the Superintendent of Post Offices with prefilled addresses from Settings.
           </p>
         </CardContent>
       </Card>
