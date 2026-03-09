@@ -125,14 +125,26 @@ export const updateSettings = async (updates: Partial<AppSettings>) => {
 
 export const getAllMemos = async (): Promise<MemoRecord[]> => {
   const userId = await getUserId();
-  const { data, error } = await supabase
-    .from('memos')
-    .select('*')
-    .eq('user_id', userId)
-    .order('serial', { ascending: false });
+  const allData: MemoRecord[] = [];
+  let from = 0;
+  const pageSize = 1000;
   
-  if (error) throw error;
-  return (data || []) as unknown as MemoRecord[];
+  while (true) {
+    const { data, error } = await supabase
+      .from('memos')
+      .select('*')
+      .eq('user_id', userId)
+      .order('serial', { ascending: false })
+      .range(from, from + pageSize - 1);
+    
+    if (error) throw error;
+    const batch = (data || []) as unknown as MemoRecord[];
+    allData.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  
+  return allData;
 };
 
 export const getMemosByStatus = async (status: string): Promise<MemoRecord[]> => {
@@ -303,14 +315,26 @@ export const saveHFTITransactions = async (
 
 export const getAllHFTITransactions = async (): Promise<HFTITransactionRecord[]> => {
   const userId = await getUserId();
-  const { data, error } = await supabase
-    .from('hfti_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('txn_date', { ascending: false });
+  const allData: HFTITransactionRecord[] = [];
+  let from = 0;
+  const pageSize = 1000;
   
-  if (error) throw error;
-  return (data || []) as unknown as HFTITransactionRecord[];
+  while (true) {
+    const { data, error } = await supabase
+      .from('hfti_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('txn_date', { ascending: false })
+      .range(from, from + pageSize - 1);
+    
+    if (error) throw error;
+    const batch = (data || []) as unknown as HFTITransactionRecord[];
+    allData.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  
+  return allData;
 };
 
 export const getHFTITransactionCount = async (): Promise<number> => {
@@ -351,57 +375,77 @@ export const getFilteredHFTITransactions = async (filters: {
   account?: string;
 }): Promise<HFTITransactionRecord[]> => {
   const userId = await getUserId();
+  const allData: HFTITransactionRecord[] = [];
+  let from = 0;
+  const pageSize = 1000;
   
-  let query = supabase
-    .from('hfti_transactions')
-    .select('*')
-    .eq('user_id', userId);
-  
-  if (filters.startDate) {
-    query = query.gte('txn_date', filters.startDate);
+  while (true) {
+    let query = supabase
+      .from('hfti_transactions')
+      .select('*')
+      .eq('user_id', userId);
+    
+    if (filters.startDate) {
+      query = query.gte('txn_date', filters.startDate);
+    }
+    if (filters.endDate) {
+      query = query.lte('txn_date', filters.endDate);
+    }
+    if (filters.debitCredit && filters.debitCredit !== 'all') {
+      query = query.eq('debit_credit', filters.debitCredit);
+    }
+    if (filters.minAmount !== undefined) {
+      query = query.gte('amount', filters.minAmount);
+    }
+    if (filters.maxAmount !== undefined) {
+      query = query.lte('amount', filters.maxAmount);
+    }
+    
+    const { data, error } = await query
+      .order('txn_date', { ascending: false })
+      .range(from, from + pageSize - 1);
+    
+    if (error) throw error;
+    const batch = (data || []) as unknown as HFTITransactionRecord[];
+    allData.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
   }
-  if (filters.endDate) {
-    query = query.lte('txn_date', filters.endDate);
-  }
-  if (filters.debitCredit && filters.debitCredit !== 'all') {
-    query = query.eq('debit_credit', filters.debitCredit);
-  }
-  if (filters.minAmount !== undefined) {
-    query = query.gte('amount', filters.minAmount);
-  }
-  if (filters.maxAmount !== undefined) {
-    query = query.lte('amount', filters.maxAmount);
-  }
-  
-  const { data, error } = await query.order('txn_date', { ascending: false });
-  
-  if (error) throw error;
-  
-  let results = (data || []) as unknown as HFTITransactionRecord[];
   
   // Account filter (needs client-side normalization)
   if (filters.account) {
     const searchAccount = filters.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
-    results = results.filter(t => {
+    return allData.filter(t => {
       const txnAccount = t.account.replace(/\D/g, '').replace(/^0+/, '') || '0';
       return txnAccount.includes(searchAccount);
     });
   }
   
-  return results;
+  return allData;
 };
 
 export const getDebitBOTransactions = async (): Promise<HFTITransactionRecord[]> => {
   const userId = await getUserId();
-  const { data, error } = await supabase
-    .from('hfti_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('debit_credit', 'D');
+  const allData: HFTITransactionRecord[] = [];
+  let from = 0;
+  const pageSize = 1000;
   
-  if (error) throw error;
-  const typedData = (data || []) as unknown as HFTITransactionRecord[];
-  return typedData.filter(t => t.bo_reference && t.bo_reference !== 'Unknown');
+  while (true) {
+    const { data, error } = await supabase
+      .from('hfti_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('debit_credit', 'D')
+      .range(from, from + pageSize - 1);
+    
+    if (error) throw error;
+    const batch = (data || []) as unknown as HFTITransactionRecord[];
+    allData.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  
+  return allData.filter(t => t.bo_reference && t.bo_reference !== 'Unknown');
 };
 
 export const clearHFTITransactions = async (): Promise<void> => {
