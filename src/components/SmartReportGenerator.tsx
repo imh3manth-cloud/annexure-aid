@@ -170,7 +170,7 @@ export const SmartReportGenerator = () => {
   }, []);
 
   // Get periods based on format
-  const periods = selectedFormat === 'monthly' ? getMonthPeriods() :
+  const periods = selectedFormat === 'monthly' ? getMonthPeriods(allMemos) :
     selectedFormat === 'quarterly' ? getQuarterPeriods() : [];
 
   // Auto-select recommended period when format changes
