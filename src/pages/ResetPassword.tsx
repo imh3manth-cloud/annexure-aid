@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Lock, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { validatePassword } from '@/lib/passwordValidation';
 
 export function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -31,8 +32,9 @@ export function ResetPassword() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      toast.error(passwordCheck.error || 'Password does not meet requirements');
       return;
     }
     if (password !== confirmPassword) {
@@ -84,7 +86,7 @@ export function ResetPassword() {
               <Label htmlFor="new-password">New Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input id="new-password" type="password" placeholder="Min 6 characters" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" disabled={loading} />
+                <Input id="new-password" type="password" placeholder="Min 12 chars, upper/lower/digit/special" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10" disabled={loading} />
               </div>
             </div>
             <div className="space-y-2">
