@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Download, FileSpreadsheet, FileText, Calendar, CalendarDays, Building2, TrendingUp, ClipboardList } from 'lucide-react';
+import { Download, FileSpreadsheet, FileText, TrendingUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { generateConsolidatedPDF, generateQuarterlyReportPDF } from '@/lib/pdfGenerator';
+import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
+import { SmartReportGenerator } from '@/components/SmartReportGenerator';
 
 type ReportType = 'all' | 'aging' | 'branch' | 'date' | 'status';
 type ExportFormat = 'excel' | 'pdf';
