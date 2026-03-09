@@ -79,8 +79,10 @@ export const ReportsNew = () => {
   const [reportData, setReportData] = useState<MemoRecord[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<string>(getMonthOptions()[1]?.value || '');
+  const [selectedQuarter, setSelectedQuarter] = useState<string>(getQuarterOptions()[0]?.value || '');
   const { toast } = useToast();
   const monthOptions = getMonthOptions();
+  const quarterOptions = getQuarterOptions();
 
   const generateReport = async () => {
     setIsGenerating(true);
