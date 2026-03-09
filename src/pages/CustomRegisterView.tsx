@@ -382,7 +382,7 @@ export const CustomRegisterView = () => {
                     <TableCell className="py-1.5 sticky right-0 bg-background">
                       {isEdit ? (
                         <div className="flex gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-green-600" onClick={() => handleSaveEdit(row.id)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => handleSaveEdit(row.id)}>
                             <Check className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingRowId(null)}>
