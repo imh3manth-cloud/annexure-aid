@@ -16,6 +16,8 @@ import { Settings } from "./pages/Settings";
 import { AccountDetails } from "./pages/AccountDetails";
 import { Operations } from "./pages/Operations";
 import { HFTIRegister } from "./pages/HFTIRegister";
+import { CustomRegisters } from "./pages/CustomRegisters";
+import { CustomRegisterView } from "./pages/CustomRegisterView";
 import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
@@ -130,6 +132,20 @@ function AppRoutes() {
         <ProtectedRoute>
           <Layout>
             <AccountDetails />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/custom-registers" element={
+        <ProtectedRoute>
+          <Layout>
+            <CustomRegisters />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/custom-register/:id" element={
+        <ProtectedRoute>
+          <Layout>
+            <CustomRegisterView />
           </Layout>
         </ProtectedRoute>
       } />
