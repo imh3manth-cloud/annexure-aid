@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Lock, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { validatePassword } from '@/lib/passwordValidation';
 
 export function ResetPassword() {
   const [password, setPassword] = useState('');

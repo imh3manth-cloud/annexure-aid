@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Mail, Lock, Shield, ArrowLeft } from 'lucide-react';
+import { validatePassword } from '@/lib/passwordValidation';
 
 export function Auth() {
   const { signIn, signUp } = useAuth();
