@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db, MemoRecord } from '@/lib/db';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
