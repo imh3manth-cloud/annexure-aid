@@ -244,14 +244,26 @@ export const getAllMemos = async (): Promise<MemoRecord[]> => {
   const userId = await getUserId();
   if (!userId) return [];
   
-  const { data, error } = await supabase
-    .from('memos')
-    .select('*')
-    .eq('user_id', userId)
-    .order('serial', { ascending: false });
-  
-  if (error) throw error;
-  return (data || []).map(dbToMemo);
+  const allData: any[] = [];
+  const PAGE_SIZE = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('memos')
+      .select('*')
+      .eq('user_id', userId)
+      .order('serial', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    allData.push(...data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  return allData.map(dbToMemo);
 };
 
 const getMemosByStatus = async (status: string): Promise<MemoRecord[]> => {
