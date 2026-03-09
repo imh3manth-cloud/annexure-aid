@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { db, MemoRecord } from '@/lib/db';
+import { db, MemoRecord, bulkUpdateMemosById } from '@/lib/db';
 import { CalendarCheck, Check, AlertCircle, Filter, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -76,25 +76,18 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
 
     setIsUpdating(true);
     try {
-      let successCount = 0;
-      
-      for (const id of Array.from(selected)) {
+      const updates = Array.from(selected).map(id => {
         const memo = printedMemos.find(m => m.id === id);
-        if (!memo) continue;
-
-        // Build remarks with sent info
+        if (!memo) return null;
         const sentInfo = `Sent: ${sentDate}`;
-        const newRemarks = memo.remarks 
-          ? `${memo.remarks}; ${sentInfo}`
-          : sentInfo;
+        const newRemarks = memo.remarks ? `${memo.remarks}; ${sentInfo}` : sentInfo;
+        return {
+          id,
+          changes: { memo_sent_date: sentDate, status: 'Pending' as const, remarks: newRemarks }
+        };
+      }).filter(Boolean) as { id: string | number; changes: Partial<MemoRecord> }[];
 
-        await db.memos.update(id, {
-          memo_sent_date: sentDate,
-          status: 'Pending',
-          remarks: newRemarks
-        });
-        successCount++;
-      }
+      const successCount = await bulkUpdateMemosById(updates);
 
       toast({ 
         title: 'Memos updated successfully', 
@@ -137,7 +130,6 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
 
     setIsUpdating(true);
     try {
-      // Get ALL memos in the range (regardless of printed or current status)
       const allMemos = await db.memos.toArray();
       const memosInRange = allMemos.filter(m => 
         m.serial >= fromSerial && 
@@ -150,24 +142,26 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
         return;
       }
 
-      let successCount = 0;
-      for (const memo of memosInRange) {
+      const updates = memosInRange.map(memo => {
         const sentInfo = `Sent: ${sentDate}`;
-        // Only add sent info if not already there
         const existingRemarks = memo.remarks || '';
         const alreadyHasSent = existingRemarks.includes('Sent:');
         const newRemarks = alreadyHasSent 
           ? existingRemarks 
           : (existingRemarks ? `${existingRemarks}; ${sentInfo}` : sentInfo);
 
-        await db.memos.update(memo.id!, {
-          memo_sent_date: sentDate,
-          status: 'Pending',
-          printed: true, // Also mark as printed
-          remarks: newRemarks
-        });
-        successCount++;
-      }
+        return {
+          id: memo.id!,
+          changes: {
+            memo_sent_date: sentDate,
+            status: 'Pending' as const,
+            printed: true,
+            remarks: newRemarks
+          }
+        };
+      });
+
+      const successCount = await bulkUpdateMemosById(updates);
 
       toast({ 
         title: 'Memos updated successfully', 

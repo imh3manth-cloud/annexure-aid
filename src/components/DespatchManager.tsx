@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { db, MemoRecord } from '@/lib/db';
+import { db, MemoRecord, bulkUpdateMemosById } from '@/lib/db';
 import { Trash2, Edit2, Check, X, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -83,15 +83,14 @@ export const DespatchManager = ({ onUpdate }: DespatchManagerProps) => {
     }
 
     try {
-      // Remove old despatch info and add new
       const cleanRemarks = removeDespatchInfo(memo.remarks);
       const newDespatchInfo = `Post No: ${editPostNo.trim()}, Despatch: ${editDate}`;
       const newRemarks = cleanRemarks ? `${cleanRemarks}; ${newDespatchInfo}` : newDespatchInfo;
 
-      await db.memos.update(memo.id!, {
-        memo_sent_date: editDate,
-        remarks: newRemarks
-      });
+      await bulkUpdateMemosById([{
+        id: memo.id!,
+        changes: { memo_sent_date: editDate, remarks: newRemarks }
+      }]);
 
       toast({ title: 'Despatch details updated' });
       handleCancelEdit();
@@ -104,21 +103,25 @@ export const DespatchManager = ({ onUpdate }: DespatchManagerProps) => {
 
   const handleRemoveDespatch = async (memoIds: (string | number)[]) => {
     try {
-      for (const id of memoIds) {
+      const updates = memoIds.map(id => {
         const memo = despatchedMemos.find(m => m.id === id);
-        if (!memo) continue;
-
+        if (!memo) return null;
         const cleanRemarks = removeDespatchInfo(memo.remarks);
-        await db.memos.update(id, {
-          memo_sent_date: null,
-          remarks: cleanRemarks,
-          printed: true // Keep as printed but remove despatch
-        });
-      }
+        return {
+          id,
+          changes: {
+            memo_sent_date: null as string | null,
+            remarks: cleanRemarks,
+            printed: true
+          } as Partial<MemoRecord>
+        };
+      }).filter(Boolean) as { id: string | number; changes: Partial<MemoRecord> }[];
+
+      await bulkUpdateMemosById(updates);
 
       toast({ 
         title: 'Despatch details removed', 
-        description: `Cleared despatch info from ${memoIds.length} memo(s)` 
+        description: `Cleared despatch info from ${updates.length} memo(s)` 
       });
       setSelected(new Set());
       await fetchDespatchedMemos();

@@ -327,7 +327,23 @@ const updateMemo = async (id: string | number, updates: Partial<MemoRecord>): Pr
   const userId = await getUserId();
   if (!userId) return false;
   
-  // Convert field names
+  const dbUpdates = memoFieldsToDb(updates);
+  
+  const { error } = await supabase
+    .from('memos')
+    .update(dbUpdates)
+    .eq('id', String(id))
+    .eq('user_id', userId);
+  
+  if (error) {
+    console.error('Failed to update memo:', error);
+    return false;
+  }
+  return true;
+};
+
+// Convert MemoRecord field names to DB column names for updates
+const memoFieldsToDb = (updates: Partial<MemoRecord>): any => {
   const dbUpdates: any = {};
   if (updates.status !== undefined) dbUpdates.status = updates.status;
   if (updates.printed !== undefined) dbUpdates.printed = updates.printed;
@@ -341,18 +357,46 @@ const updateMemo = async (id: string | number, updates: Partial<MemoRecord>): Pr
   if (updates.address !== undefined) dbUpdates.address = updates.address;
   if (updates.balance !== undefined) dbUpdates.balance = updates.balance;
   if (updates.balance_date !== undefined) dbUpdates.balance_date = updates.balance_date || null;
-  
-  const { error } = await supabase
-    .from('memos')
-    .update(dbUpdates)
-    .eq('id', String(id))
-    .eq('user_id', userId);
-  
-  if (error) {
-    console.error('Failed to update memo:', error);
-    return false;
+  return dbUpdates;
+};
+
+/**
+ * Bulk update multiple memos with DIFFERENT data per memo.
+ * Uses parallel batched requests for speed.
+ */
+export const bulkUpdateMemosById = async (
+  updates: { id: string | number; changes: Partial<MemoRecord> }[],
+  onProgress?: (current: number, total: number) => void
+): Promise<number> => {
+  const userId = await getUserId();
+  if (!userId) return 0;
+
+  const BATCH_SIZE = 50;
+  let successCount = 0;
+
+  for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+    const batch = updates.slice(i, i + BATCH_SIZE);
+    
+    const promises = batch.map(({ id, changes }) => {
+      const dbUpdates = memoFieldsToDb(changes);
+      return supabase
+        .from('memos')
+        .update(dbUpdates)
+        .eq('id', String(id))
+        .eq('user_id', userId);
+    });
+
+    const results = await Promise.all(promises);
+    
+    for (const result of results) {
+      if (!result.error) successCount++;
+      else console.error('Bulk update error:', result.error);
+    }
+
+    onProgress?.(Math.min(i + BATCH_SIZE, updates.length), updates.length);
   }
-  return true;
+
+  return successCount;
 };
 
 export const clearAllMemos = async (): Promise<number> => {
