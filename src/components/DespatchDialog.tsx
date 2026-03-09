@@ -27,6 +27,7 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
   const [pendingMemos, setPendingMemos] = useState<MemoRecord[]>([]);
   const [despatchHistory, setDespatchHistory] = useState<DespatchRecord[]>([]);
   const [daysSinceLastDespatch, setDaysSinceLastDespatch] = useState<number | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
