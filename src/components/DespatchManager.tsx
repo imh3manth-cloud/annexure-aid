@@ -103,21 +103,25 @@ export const DespatchManager = ({ onUpdate }: DespatchManagerProps) => {
 
   const handleRemoveDespatch = async (memoIds: (string | number)[]) => {
     try {
-      for (const id of memoIds) {
+      const updates = memoIds.map(id => {
         const memo = despatchedMemos.find(m => m.id === id);
-        if (!memo) continue;
-
+        if (!memo) return null;
         const cleanRemarks = removeDespatchInfo(memo.remarks);
-        await db.memos.update(id, {
-          memo_sent_date: null,
-          remarks: cleanRemarks,
-          printed: true // Keep as printed but remove despatch
-        });
-      }
+        return {
+          id,
+          changes: {
+            memo_sent_date: null as string | null,
+            remarks: cleanRemarks,
+            printed: true
+          } as Partial<MemoRecord>
+        };
+      }).filter(Boolean) as { id: string | number; changes: Partial<MemoRecord> }[];
+
+      await bulkUpdateMemosById(updates);
 
       toast({ 
         title: 'Despatch details removed', 
-        description: `Cleared despatch info from ${memoIds.length} memo(s)` 
+        description: `Cleared despatch info from ${updates.length} memo(s)` 
       });
       setSelected(new Set());
       await fetchDespatchedMemos();
