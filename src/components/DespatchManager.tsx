@@ -83,15 +83,14 @@ export const DespatchManager = ({ onUpdate }: DespatchManagerProps) => {
     }
 
     try {
-      // Remove old despatch info and add new
       const cleanRemarks = removeDespatchInfo(memo.remarks);
       const newDespatchInfo = `Post No: ${editPostNo.trim()}, Despatch: ${editDate}`;
       const newRemarks = cleanRemarks ? `${cleanRemarks}; ${newDespatchInfo}` : newDespatchInfo;
 
-      await db.memos.update(memo.id!, {
-        memo_sent_date: editDate,
-        remarks: newRemarks
-      });
+      await bulkUpdateMemosById([{
+        id: memo.id!,
+        changes: { memo_sent_date: editDate, remarks: newRemarks }
+      }]);
 
       toast({ title: 'Despatch details updated' });
       handleCancelEdit();
