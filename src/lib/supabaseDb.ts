@@ -315,14 +315,26 @@ export const saveHFTITransactions = async (
 
 export const getAllHFTITransactions = async (): Promise<HFTITransactionRecord[]> => {
   const userId = await getUserId();
-  const { data, error } = await supabase
-    .from('hfti_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('txn_date', { ascending: false });
+  const allData: HFTITransactionRecord[] = [];
+  let from = 0;
+  const pageSize = 1000;
   
-  if (error) throw error;
-  return (data || []) as unknown as HFTITransactionRecord[];
+  while (true) {
+    const { data, error } = await supabase
+      .from('hfti_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('txn_date', { ascending: false })
+      .range(from, from + pageSize - 1);
+    
+    if (error) throw error;
+    const batch = (data || []) as unknown as HFTITransactionRecord[];
+    allData.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  
+  return allData;
 };
 
 export const getHFTITransactionCount = async (): Promise<number> => {
