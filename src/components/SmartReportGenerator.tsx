@@ -34,16 +34,41 @@ interface PreviewStats {
 
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-const getMonthPeriods = (): PeriodOption[] => {
+const getMonthPeriods = (memos: MemoRecord[]): PeriodOption[] => {
   const options: PeriodOption[] = [];
   const now = new Date();
-  for (let i = 0; i < 12; i++) {
+  // Go back up to 24 months to cover older transaction data
+  for (let i = 0; i < 24; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     options.push({
       value: `${d.getFullYear()}-${d.getMonth()}`,
       label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
       recommended: i === 1, // last completed month
     });
+  }
+  // Also find the month with most memos and mark it
+  if (memos.length > 0) {
+    const monthCounts = new Map<string, number>();
+    memos.forEach(m => {
+      const d = new Date(m.txn_date);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      monthCounts.set(key, (monthCounts.get(key) || 0) + 1);
+    });
+    let maxKey = '';
+    let maxCount = 0;
+    monthCounts.forEach((count, key) => {
+      if (count > maxCount) { maxCount = count; maxKey = key; }
+    });
+    // If the recommended month has no data but another does, shift recommendation
+    const recommendedIdx = options.findIndex(o => o.recommended);
+    if (recommendedIdx >= 0) {
+      const recKey = options[recommendedIdx].value;
+      if (!monthCounts.has(recKey) && maxKey) {
+        options[recommendedIdx].recommended = false;
+        const dataIdx = options.findIndex(o => o.value === maxKey);
+        if (dataIdx >= 0) options[dataIdx].recommended = true;
+      }
+    }
   }
   return options;
 };
