@@ -76,25 +76,18 @@ export const ManualSentDateUpdater = ({ onUpdate }: ManualSentDateUpdaterProps) 
 
     setIsUpdating(true);
     try {
-      let successCount = 0;
-      
-      for (const id of Array.from(selected)) {
+      const updates = Array.from(selected).map(id => {
         const memo = printedMemos.find(m => m.id === id);
-        if (!memo) continue;
-
-        // Build remarks with sent info
+        if (!memo) return null;
         const sentInfo = `Sent: ${sentDate}`;
-        const newRemarks = memo.remarks 
-          ? `${memo.remarks}; ${sentInfo}`
-          : sentInfo;
+        const newRemarks = memo.remarks ? `${memo.remarks}; ${sentInfo}` : sentInfo;
+        return {
+          id,
+          changes: { memo_sent_date: sentDate, status: 'Pending' as const, remarks: newRemarks }
+        };
+      }).filter(Boolean) as { id: string | number; changes: Partial<MemoRecord> }[];
 
-        await db.memos.update(id, {
-          memo_sent_date: sentDate,
-          status: 'Pending',
-          remarks: newRemarks
-        });
-        successCount++;
-      }
+      const successCount = await bulkUpdateMemosById(updates);
 
       toast({ 
         title: 'Memos updated successfully', 
