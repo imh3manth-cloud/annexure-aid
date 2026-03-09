@@ -251,6 +251,62 @@ export const ReportsNew = () => {
         </CardContent>
       </Card>
 
+      {/* Quarterly Report Card */}
+      <Card className="relative overflow-hidden shadow-xl border-primary/10">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary" />
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <ClipboardList className="h-5 w-5 text-primary" />
+            </div>
+            Quarterly Report to Divisional Superintendent
+          </CardTitle>
+          <CardDescription>
+            Quarterly verification summary report as per POSB CBS Manual (due 5th of Jan, Apr, Jul, Oct)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-end gap-4">
+            <div className="flex-1 space-y-2">
+              <Label>Select Quarter</Label>
+              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select quarter" />
+                </SelectTrigger>
+                <SelectContent>
+                  {quarterOptions.map(q => (
+                    <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={async () => {
+              if (!selectedQuarter) {
+                toast({ title: 'Please select a quarter', variant: 'destructive' });
+                return;
+              }
+              try {
+                const qOpt = quarterOptions.find(q => q.value === selectedQuarter);
+                if (!qOpt) return;
+                const memos = await db.memos.toArray();
+                const doc = generateQuarterlyReportPDF(memos, qOpt.startDate, qOpt.endDate);
+                doc.save(`quarterly_report_${qOpt.label.replace(/[\s()]/g, '_')}.pdf`);
+                toast({ title: 'Quarterly Report Generated', description: `Report for ${qOpt.label} ready` });
+              } catch (error: any) {
+                toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
+              }
+            }} className="gap-2">
+              <FileText className="w-4 h-4" />
+              Generate Quarterly Report
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Generates a formal quarterly verification report with summary statistics and BO-wise breakdown, 
+            addressed to the Superintendent of Post Offices with prefilled addresses from Settings.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Report Configuration */}
       <Card className="relative overflow-hidden shadow-xl border-primary/10">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary" />
