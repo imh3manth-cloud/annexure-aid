@@ -30,6 +30,44 @@ const getMonthOptions = () => {
   return options;
 };
 
+// Generate quarter options (last 4 quarters)
+const getQuarterOptions = () => {
+  const options: { value: string; label: string; startDate: Date; endDate: Date }[] = [];
+  const now = new Date();
+  
+  for (let i = 0; i < 4; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - (i * 3), 1);
+    const month = d.getMonth();
+    
+    let qStart: Date, qEnd: Date, qLabel: string;
+    
+    if (month >= 0 && month <= 2) {
+      qStart = new Date(d.getFullYear(), 0, 1);
+      qEnd = new Date(d.getFullYear(), 2, 31);
+      qLabel = `Q4 (Jan-Mar ${d.getFullYear()})`;
+    } else if (month >= 3 && month <= 5) {
+      qStart = new Date(d.getFullYear(), 3, 1);
+      qEnd = new Date(d.getFullYear(), 5, 30);
+      qLabel = `Q1 (Apr-Jun ${d.getFullYear()})`;
+    } else if (month >= 6 && month <= 8) {
+      qStart = new Date(d.getFullYear(), 6, 1);
+      qEnd = new Date(d.getFullYear(), 8, 30);
+      qLabel = `Q2 (Jul-Sep ${d.getFullYear()})`;
+    } else {
+      qStart = new Date(d.getFullYear(), 9, 1);
+      qEnd = new Date(d.getFullYear(), 11, 31);
+      qLabel = `Q3 (Oct-Dec ${d.getFullYear()})`;
+    }
+    
+    const value = `${qStart.getFullYear()}-${qStart.getMonth()}`;
+    if (!options.find(o => o.value === value)) {
+      options.push({ value, label: qLabel, startDate: qStart, endDate: qEnd });
+    }
+  }
+  return options;
+};
+
+
 export const ReportsNew = () => {
   const [reportType, setReportType] = useState<ReportType>('all');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('excel');
