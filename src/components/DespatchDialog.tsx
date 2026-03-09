@@ -373,9 +373,9 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={pendingMemos.length === 0 && !fromMemo}>
+            <Button onClick={handleSave} disabled={(pendingMemos.length === 0 && !fromMemo) || isSaving}>
               <Send className="w-4 h-4 mr-2" />
-              Save Details
+              {isSaving ? 'Saving...' : 'Save Details'}
             </Button>
           </div>
         </TabsContent>
