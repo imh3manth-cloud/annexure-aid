@@ -150,9 +150,12 @@ export const SmartReportGenerator = () => {
 
   // Compute preview stats when period changes
   const computeStats = useCallback(() => {
-    if (allMemos.length === 0) return;
-
     let filtered: MemoRecord[];
+
+    if (allMemos.length === 0) {
+      setStats({ total: 0, verified: 0, pending: 0, reported: 0, totalAmount: 0, boCount: 0 });
+      return;
+    }
 
     if (selectedFormat === 'overdue') {
       const cutoff = new Date();
