@@ -124,7 +124,10 @@ export const SmartReportGenerator = () => {
 
   // Load all memos once
   useEffect(() => {
-    db.memos.toArray().then(setAllMemos);
+    db.memos.toArray().then((memos) => {
+      console.log('SmartReportGenerator loaded memos:', memos.length);
+      setAllMemos(memos);
+    }).catch(err => console.error('Failed to load memos:', err));
   }, []);
 
   // Get periods based on format
