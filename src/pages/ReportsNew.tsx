@@ -14,61 +14,6 @@ import { SmartReportGenerator } from '@/components/SmartReportGenerator';
 type ReportType = 'all' | 'aging' | 'branch' | 'date' | 'status';
 type ExportFormat = 'excel' | 'pdf';
 
-// Generate month options (last 12 months)
-const getMonthOptions = () => {
-  const options: { value: string; label: string; month: number; year: number }[] = [];
-  const now = new Date();
-  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  for (let i = 0; i < 12; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    options.push({
-      value: `${d.getFullYear()}-${d.getMonth()}`,
-      label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
-      month: d.getMonth(),
-      year: d.getFullYear()
-    });
-  }
-  return options;
-};
-
-// Generate quarter options (last 4 quarters)
-const getQuarterOptions = () => {
-  const options: { value: string; label: string; startDate: Date; endDate: Date }[] = [];
-  const now = new Date();
-  
-  for (let i = 0; i < 4; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth() - (i * 3), 1);
-    const month = d.getMonth();
-    
-    let qStart: Date, qEnd: Date, qLabel: string;
-    
-    if (month >= 0 && month <= 2) {
-      qStart = new Date(d.getFullYear(), 0, 1);
-      qEnd = new Date(d.getFullYear(), 2, 31);
-      qLabel = `Q4 (Jan-Mar ${d.getFullYear()})`;
-    } else if (month >= 3 && month <= 5) {
-      qStart = new Date(d.getFullYear(), 3, 1);
-      qEnd = new Date(d.getFullYear(), 5, 30);
-      qLabel = `Q1 (Apr-Jun ${d.getFullYear()})`;
-    } else if (month >= 6 && month <= 8) {
-      qStart = new Date(d.getFullYear(), 6, 1);
-      qEnd = new Date(d.getFullYear(), 8, 30);
-      qLabel = `Q2 (Jul-Sep ${d.getFullYear()})`;
-    } else {
-      qStart = new Date(d.getFullYear(), 9, 1);
-      qEnd = new Date(d.getFullYear(), 11, 31);
-      qLabel = `Q3 (Oct-Dec ${d.getFullYear()})`;
-    }
-    
-    const value = `${qStart.getFullYear()}-${qStart.getMonth()}`;
-    if (!options.find(o => o.value === value)) {
-      options.push({ value, label: qLabel, startDate: qStart, endDate: qEnd });
-    }
-  }
-  return options;
-};
-
-
 export const ReportsNew = () => {
   const [reportType, setReportType] = useState<ReportType>('all');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('excel');
@@ -79,18 +24,13 @@ export const ReportsNew = () => {
   const [agingDays, setAgingDays] = useState('30');
   const [reportData, setReportData] = useState<MemoRecord[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState<string>(getMonthOptions()[1]?.value || '');
-  const [selectedQuarter, setSelectedQuarter] = useState<string>(getQuarterOptions()[0]?.value || '');
   const { toast } = useToast();
-  const monthOptions = getMonthOptions();
-  const quarterOptions = getQuarterOptions();
 
   const generateReport = async () => {
     setIsGenerating(true);
     try {
       let memos = await db.memos.toArray();
 
-      // Filter based on report type
       switch (reportType) {
         case 'aging':
           const days = parseInt(agingDays);
@@ -102,13 +42,11 @@ export const ReportsNew = () => {
             new Date(m.memo_sent_date) <= cutoffDate
           );
           break;
-
         case 'branch':
           if (selectedBO) {
             memos = memos.filter(m => m.BO_Code === selectedBO || m.BO_Name === selectedBO);
           }
           break;
-
         case 'date':
           if (startDate && endDate) {
             memos = memos.filter(m => {
@@ -117,7 +55,6 @@ export const ReportsNew = () => {
             });
           }
           break;
-
         case 'status':
           if (selectedStatus) {
             memos = memos.filter(m => m.status === selectedStatus);
@@ -139,7 +76,6 @@ export const ReportsNew = () => {
       toast({ title: 'No data to export', description: 'Please generate a report first', variant: 'destructive' });
       return;
     }
-
     if (exportFormat === 'excel') {
       exportToExcel();
     } else {
@@ -172,10 +108,8 @@ export const ReportsNew = () => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    
     const filename = `${reportType}_report_${new Date().toISOString().split('T')[0]}.xlsx`;
     XLSX.writeFile(wb, filename);
-    
     toast({ title: 'Excel export successful' });
   };
 
@@ -186,24 +120,6 @@ export const ReportsNew = () => {
     toast({ title: 'PDF export successful' });
   };
 
-  const generateMonthlyReport = async () => {
-    if (!selectedMonth) {
-      toast({ title: 'Please select a month', variant: 'destructive' });
-      return;
-    }
-    try {
-      const monthOpt = monthOptions.find(m => m.value === selectedMonth);
-      if (!monthOpt) return;
-      const memos = await db.memos.toArray();
-      const { generateMonthlyReportPDF } = await import('@/lib/pdfGenerator');
-      const doc = generateMonthlyReportPDF(memos, monthOpt.month, monthOpt.year);
-      doc.save(`monthly_report_${monthOpt.label.replace(/\s+/g, '_')}.pdf`);
-      toast({ title: 'Monthly Report Generated', description: `Report for ${monthOpt.label} ready` });
-    } catch (error: any) {
-      toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
-    }
-  };
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -211,102 +127,8 @@ export const ReportsNew = () => {
         <p className="text-muted-foreground mt-1">Generate detailed reports and export data</p>
       </div>
 
-      {/* Monthly Report Card */}
-      <Card className="relative overflow-hidden shadow-xl border-accent/10">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent via-primary to-accent" />
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-accent/10">
-              <CalendarDays className="h-5 w-5 text-accent-foreground" />
-            </div>
-            Monthly Report to Divisional Office
-          </CardTitle>
-          <CardDescription>
-            Prefilled letter with BO-wise summary and memo details for the selected month
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-end gap-4">
-            <div className="flex-1 space-y-2">
-              <Label>Select Month</Label>
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  {monthOptions.map(m => (
-                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={generateMonthlyReport} className="gap-2">
-              <FileText className="w-4 h-4" />
-              Generate Monthly Report
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Generates a prefilled formal letter addressed to the Superintendent of Post Offices with 
-            summary statistics, BO-wise consolidated table, and detailed memo listing.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Quarterly Report Card */}
-      <Card className="relative overflow-hidden shadow-xl border-primary/10">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-accent to-primary" />
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <ClipboardList className="h-5 w-5 text-primary" />
-            </div>
-            Quarterly Report to Divisional Superintendent
-          </CardTitle>
-          <CardDescription>
-            Quarterly verification summary report as per POSB CBS Manual (due 5th of Jan, Apr, Jul, Oct)
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-end gap-4">
-            <div className="flex-1 space-y-2">
-              <Label>Select Quarter</Label>
-              <Select value={selectedQuarter} onValueChange={setSelectedQuarter}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select quarter" />
-                </SelectTrigger>
-                <SelectContent>
-                  {quarterOptions.map(q => (
-                    <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={async () => {
-              if (!selectedQuarter) {
-                toast({ title: 'Please select a quarter', variant: 'destructive' });
-                return;
-              }
-              try {
-                const qOpt = quarterOptions.find(q => q.value === selectedQuarter);
-                if (!qOpt) return;
-                const memos = await db.memos.toArray();
-                const doc = generateQuarterlyReportPDF(memos, qOpt.startDate, qOpt.endDate);
-                doc.save(`quarterly_report_${qOpt.label.replace(/[\s()]/g, '_')}.pdf`);
-                toast({ title: 'Quarterly Report Generated', description: `Report for ${qOpt.label} ready` });
-              } catch (error: any) {
-                toast({ title: 'Report generation failed', description: error.message, variant: 'destructive' });
-              }
-            }} className="gap-2">
-              <FileText className="w-4 h-4" />
-              Generate Quarterly Report
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Generates a formal quarterly verification report with summary statistics and BO-wise breakdown, 
-            addressed to the Superintendent of Post Offices with prefilled addresses from Settings.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Smart Letter Generator */}
+      <SmartReportGenerator />
 
       {/* Report Configuration */}
       <Card className="relative overflow-hidden shadow-xl border-primary/10">
@@ -316,18 +138,16 @@ export const ReportsNew = () => {
             <div className="p-2 rounded-lg bg-primary/10">
               <FileText className="h-5 w-5 text-primary" />
             </div>
-            Report Configuration
+            Data Export
           </CardTitle>
-          <CardDescription>Select report type and filters</CardDescription>
+          <CardDescription>Filter and export memo data as Excel or PDF</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <Label>Report Type</Label>
               <Select value={reportType} onValueChange={(v) => setReportType(v as ReportType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Memos</SelectItem>
                   <SelectItem value="aging">Aging Analysis</SelectItem>
@@ -337,13 +157,10 @@ export const ReportsNew = () => {
                 </SelectContent>
               </Select>
             </div>
-
             <div>
               <Label>Export Format</Label>
               <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as ExportFormat)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="excel">Excel (.xlsx)</SelectItem>
                   <SelectItem value="pdf">PDF</SelectItem>
@@ -352,58 +169,35 @@ export const ReportsNew = () => {
             </div>
           </div>
 
-          {/* Report-specific filters */}
           {reportType === 'aging' && (
             <div>
               <Label>Pending For (Days)</Label>
-              <Input
-                type="number"
-                value={agingDays}
-                onChange={(e) => setAgingDays(e.target.value)}
-                placeholder="Enter number of days"
-              />
+              <Input type="number" value={agingDays} onChange={(e) => setAgingDays(e.target.value)} placeholder="Enter number of days" />
             </div>
           )}
-
           {reportType === 'branch' && (
             <div>
               <Label>Branch Office</Label>
-              <Input
-                value={selectedBO}
-                onChange={(e) => setSelectedBO(e.target.value)}
-                placeholder="Enter branch office code or name"
-              />
+              <Input value={selectedBO} onChange={(e) => setSelectedBO(e.target.value)} placeholder="Enter branch office code or name" />
             </div>
           )}
-
           {reportType === 'date' && (
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <Label>Start Date</Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               </div>
               <div>
                 <Label>End Date</Label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
+                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
               </div>
             </div>
           )}
-
           {reportType === 'status' && (
             <div>
               <Label>Status</Label>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="New">New</SelectItem>
                   <SelectItem value="Pending">Pending</SelectItem>
