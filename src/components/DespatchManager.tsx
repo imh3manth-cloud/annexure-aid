@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { db, MemoRecord } from '@/lib/db';
+import { db, MemoRecord, bulkUpdateMemosById } from '@/lib/db';
 import { Trash2, Edit2, Check, X, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
