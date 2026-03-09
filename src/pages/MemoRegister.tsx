@@ -72,6 +72,17 @@ export const MemoRegister = () => {
     });
   }, []);
 
+  // Refresh data when navigating back to this page
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadMemos();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
+
   const loadMemos = async () => {
     const allMemos = await db.memos.orderBy('serial').reverse().toArray();
     setMemos(allMemos);
