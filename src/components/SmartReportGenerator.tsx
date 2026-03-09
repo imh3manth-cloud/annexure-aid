@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { db, MemoRecord } from '@/lib/db';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -122,12 +123,25 @@ export const SmartReportGenerator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast } = useToast();
 
-  // Load all memos once
+  // Load all memos once auth is ready
   useEffect(() => {
-    db.memos.toArray().then((memos) => {
+    const loadMemos = async () => {
+      const memos = await db.memos.toArray();
       console.log('SmartReportGenerator loaded memos:', memos.length);
       setAllMemos(memos);
-    }).catch(err => console.error('Failed to load memos:', err));
+    };
+
+    // Listen for auth state to ensure user is ready
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        loadMemos().catch(err => console.error('Failed to load memos:', err));
+      }
+    });
+
+    // Also try immediately in case auth is already ready
+    loadMemos().catch(err => console.error('Failed to load memos:', err));
+
+    return () => subscription.unsubscribe();
   }, []);
 
   // Get periods based on format
