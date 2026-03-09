@@ -125,14 +125,26 @@ export const updateSettings = async (updates: Partial<AppSettings>) => {
 
 export const getAllMemos = async (): Promise<MemoRecord[]> => {
   const userId = await getUserId();
-  const { data, error } = await supabase
-    .from('memos')
-    .select('*')
-    .eq('user_id', userId)
-    .order('serial', { ascending: false });
+  const allData: MemoRecord[] = [];
+  let from = 0;
+  const pageSize = 1000;
   
-  if (error) throw error;
-  return (data || []) as unknown as MemoRecord[];
+  while (true) {
+    const { data, error } = await supabase
+      .from('memos')
+      .select('*')
+      .eq('user_id', userId)
+      .order('serial', { ascending: false })
+      .range(from, from + pageSize - 1);
+    
+    if (error) throw error;
+    const batch = (data || []) as unknown as MemoRecord[];
+    allData.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  
+  return allData;
 };
 
 export const getMemosByStatus = async (status: string): Promise<MemoRecord[]> => {
