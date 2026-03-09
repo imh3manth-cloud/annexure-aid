@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, MemoRecord, generateMemosFromHFTI, getEligibleHFTICount, initSettings, clearAllMemos, getLastBalanceCount, syncMemoNamesFromBalance } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
