@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Download, FileSpreadsheet, FileText, Calendar, CalendarDays, Building2, TrendingUp, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { generateConsolidatedPDF } from '@/lib/pdfGenerator';
+import { generateConsolidatedPDF, generateQuarterlyReportPDF } from '@/lib/pdfGenerator';
 
 type ReportType = 'all' | 'aging' | 'branch' | 'date' | 'status';
 type ExportFormat = 'excel' | 'pdf';
