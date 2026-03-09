@@ -86,38 +86,39 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
       return;
     }
 
+    if (isSaving) return;
+    setIsSaving(true);
+
     try {
-      // Find memos in the range that DON'T already have despatch details
       const allMemos = await db.memos.toArray();
       const memosInRange = allMemos.filter(m => 
         m.serial >= fromSerial && 
         m.serial <= toSerial && 
-        !m.remarks?.includes('Post No:') // Only memos without despatch info
+        !m.remarks?.includes('Post No:')
       );
 
       if (memosInRange.length === 0) {
-        // Check if there are memos in range but all have despatch already
         const allInRange = allMemos.filter(m => m.serial >= fromSerial && m.serial <= toSerial);
         if (allInRange.length > 0) {
           toast({ title: 'All memos in this range already have despatch details', variant: 'destructive' });
         } else {
           toast({ title: 'No memos found in this range', variant: 'destructive' });
         }
+        setIsSaving(false);
         return;
       }
 
-      // Update each memo with despatch details - use despatch date as memo_sent_date
+      // Build batch updates
       const despatchInfo = `Post No: ${postNumber}, Despatch: ${despatchDate}`;
-      for (const memo of memosInRange) {
-        const newRemarks = memo.remarks 
-          ? `${memo.remarks}; ${despatchInfo}`
-          : despatchInfo;
+      const updates = memosInRange.map(memo => ({
+        id: memo.id!,
+        changes: {
+          memo_sent_date: despatchDate,
+          remarks: memo.remarks ? `${memo.remarks}; ${despatchInfo}` : despatchInfo
+        } as Partial<MemoRecord>
+      }));
 
-        await db.memos.update(memo.id!, {
-          memo_sent_date: despatchDate, // Use despatch date as memo sent date
-          remarks: newRemarks
-        });
-      }
+      await bulkUpdateMemosById(updates);
 
       // Save despatch record
       await saveDespatchRecord({
@@ -133,21 +134,19 @@ export const DespatchDialog = ({ onDespatchSaved }: DespatchDialogProps) => {
         description: `Updated ${memosInRange.length} memos (${fromSerial} to ${toSerial})` 
       });
 
-      // Reset form
       setFromMemo('');
       setToMemo('');
       setPostNumber('');
       setDespatchDate(new Date().toISOString().split('T')[0]);
       setOpen(false);
       
-      // Refresh data
       await fetchPendingMemos();
       await fetchDespatchHistory();
-      
-      // Callback
       onDespatchSaved?.();
     } catch (error: any) {
       toast({ title: 'Failed to save despatch details', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsSaving(false);
     }
   };
 
