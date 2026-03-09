@@ -1255,134 +1255,73 @@ export const generateMonthlyReportPDF = (
   });
   y += 8;
 
-  // === SECTION 2: BO-WISE CONSOLIDATED SUMMARY ===
+  // === SECTION 2: DETAILED MEMO LIST ===
   if (y > 240) { doc.addPage(); y = 15; }
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10);
-  doc.text('II. Branch Office wise Summary:', margin, y);
+  doc.text('II. Memo Details:', margin, y);
   y += 7;
   
-  // Group memos by BO
-  const boGroups: Record<string, MemoRecord[]> = {};
-  monthMemos.forEach(memo => {
-    const bo = memo.BO_Name || 'Unknown';
-    if (!boGroups[bo]) boGroups[bo] = [];
-    boGroups[bo].push(memo);
-  });
+  // Sort all memos by serial number
+  const sortedMemos = [...monthMemos].sort((a, b) => a.serial - b.serial);
   
-  const boNames = Object.keys(boGroups).sort();
+  const detailColWidths = [18, 30, 25, 50, 30, 27];
+  const detailHeaders = ['Memo No.', 'Account No.', 'Date', 'Depositor Name', 'Amount (₹)', 'Status'];
   
-  const bColWidths = [15, 70, 30, 45];
-  doc.setFontSize(8);
+  // Detail table header
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'bold');
+  const thH = 6;
+  doc.rect(margin, y - 3.5, contentWidth, thH);
+  let dx = margin + 1;
+  detailHeaders.forEach((h, i) => {
+    doc.text(h, dx, y);
+    dx += detailColWidths[i];
+  });
+  y += thH;
   
-  const bhH = 7;
-  doc.rect(margin, y - 4, contentWidth, bhH);
-  let bx = margin + 2;
-  doc.text('Sl.', bx, y);
-  bx += bColWidths[0];
-  doc.text('Branch Office', bx, y);
-  bx += bColWidths[1];
-  doc.text('No. of Memos', bx, y);
-  bx += bColWidths[2];
-  doc.text('Total Amount (₹)', bx, y);
-  y += bhH - 1;
-  
+  // Detail rows
   doc.setFont('helvetica', 'normal');
-  let grandTotal = 0;
-  let grandCount = 0;
+  doc.setFontSize(7.5);
   
-  boNames.forEach((bo, idx) => {
-    const group = boGroups[bo];
-    const boAmount = group.reduce((sum, m) => sum + m.amount, 0);
-    grandTotal += boAmount;
-    grandCount += group.length;
-    
-    const rH = 6;
-    doc.rect(margin, y - 3.5, contentWidth, rH);
-    bx = margin + 2;
-    doc.text(String(idx + 1), bx, y);
-    bx += bColWidths[0];
-    doc.text(bo, bx, y);
-    bx += bColWidths[1];
-    doc.text(String(group.length), bx, y);
-    bx += bColWidths[2];
-    doc.text(formatAmount(boAmount), bx, y);
-    y += rH;
-  });
-  
-  // Grand total
-  const gtH = 7;
-  doc.setFont('helvetica', 'bold');
-  doc.rect(margin, y - 3.5, contentWidth, gtH);
-  bx = margin + 2 + bColWidths[0];
-  doc.text('GRAND TOTAL', bx, y);
-  bx += bColWidths[1];
-  doc.text(String(grandCount), bx, y);
-  bx += bColWidths[2];
-  doc.text(formatAmount(grandTotal), bx, y);
-  y += gtH + 8;
-
-  // === SECTION 3: BO-WISE DETAILED TABLE ===
-  if (y > 240) { doc.addPage(); y = 15; }
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.text('III. Branch Office wise Memo Details:', margin, y);
-  y += 7;
-  
-  const detailColWidths = [18, 28, 25, 55, 30];
-  const detailHeaders = ['Memo No.', 'Account No.', 'Date', 'Depositor Name', 'Amount (₹)'];
-  
-  boNames.forEach((bo) => {
-    const group = boGroups[bo];
-    const boTotal = group.reduce((sum, m) => sum + m.amount, 0);
-    
-    if (y > 255) { doc.addPage(); y = 15; }
-    
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${bo} (${group.length} memos, ₹${formatAmount(boTotal)})`, margin, y);
-    y += 5;
-    
-    doc.setFontSize(7.5);
-    doc.setFont('helvetica', 'bold');
-    const thH = 6;
-    doc.rect(margin, y - 3.5, contentWidth, thH);
-    let dx = margin + 1;
-    detailHeaders.forEach((h, i) => {
-      doc.text(h, dx, y);
-      dx += detailColWidths[i];
-    });
-    y += thH;
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    
-    group.sort((a, b) => a.serial - b.serial).forEach((memo) => {
-      if (y > 280) { doc.addPage(); y = 15; }
-      
-      const rowH = 5.5;
-      doc.rect(margin, y - 3.5, contentWidth, rowH);
+  sortedMemos.forEach((memo) => {
+    if (y > 280) {
+      doc.addPage();
+      y = 15;
+      // Re-draw header
+      doc.setFontSize(7.5);
+      doc.setFont('helvetica', 'bold');
+      doc.rect(margin, y - 3.5, contentWidth, thH);
       dx = margin + 1;
-      doc.text(String(memo.serial), dx, y);
-      dx += detailColWidths[0];
-      doc.text(memo.account, dx, y);
-      dx += detailColWidths[1];
-      doc.text(formatDate(memo.txn_date), dx, y);
-      dx += detailColWidths[2];
-      const nameText = doc.splitTextToSize(memo.name || '', detailColWidths[3] - 3);
-      doc.text(nameText[0] || '', dx, y);
-      dx += detailColWidths[3];
-      doc.text(formatAmount(memo.amount), dx, y);
-      y += rowH;
-    });
+      detailHeaders.forEach((h, i) => {
+        doc.text(h, dx, y);
+        dx += detailColWidths[i];
+      });
+      y += thH;
+      doc.setFont('helvetica', 'normal');
+    }
     
-    y += 5;
+    const rowH = 5.5;
+    doc.rect(margin, y - 3.5, contentWidth, rowH);
+    dx = margin + 1;
+    doc.text(String(memo.serial), dx, y);
+    dx += detailColWidths[0];
+    doc.text(memo.account, dx, y);
+    dx += detailColWidths[1];
+    doc.text(formatDate(memo.txn_date), dx, y);
+    dx += detailColWidths[2];
+    const nameText = doc.splitTextToSize(memo.name || '', detailColWidths[3] - 3);
+    doc.text(nameText[0] || '', dx, y);
+    dx += detailColWidths[3];
+    doc.text(formatAmount(memo.amount), dx, y);
+    dx += detailColWidths[4];
+    doc.text(memo.status || '', dx, y);
+    y += rowH;
   });
 
   // === SIGNATURE BLOCK ===
   y += 10;
-  if (y > 260) { doc.addPage(); y = 40; }
+  if (y > 250) { doc.addPage(); y = 40; }
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -1395,6 +1334,19 @@ export const generateMonthlyReportPDF = (
   doc.text('Sub Postmaster', pageWidth - margin, y, { align: 'right' });
   y += 5;
   doc.text(`${config.officeName}`, pageWidth - margin, y, { align: 'right' });
+  
+  // === COPY TO IP OFFICE ===
+  y += 15;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Copy to:', margin, y);
+  y += 5;
+  doc.text('☐', margin + 5, y);
+  const ipAddr = config.ipOfficeAddress || { name: 'The Inspector of Posts', line1: config.subdivision, line2: '', city: '', pincode: '' };
+  doc.text(`${ipAddr.name}, ${ipAddr.line1}${ipAddr.city ? ', ' + ipAddr.city : ''}${ipAddr.pincode ? ' - ' + ipAddr.pincode : ''}`, margin + 12, y);
+  y += 5;
+  doc.setFontSize(8);
+  doc.text('(For information and necessary action please)', margin + 12, y);
   
   return doc;
 };
