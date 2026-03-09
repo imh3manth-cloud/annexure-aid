@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db, MemoRecord, generateMemosFromHFTI, getEligibleHFTICount, initSettings, clearAllMemos, getLastBalanceCount, syncMemoNamesFromBalance } from '@/lib/db';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,6 +70,17 @@ export const MemoRegister = () => {
       loadMemos();
       loadEligibleCount();
     });
+  }, []);
+
+  // Refresh data when navigating back to this page
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadMemos();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   const loadMemos = async () => {

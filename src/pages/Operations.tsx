@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { menuItems } from '@/components/Layout';
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { db, getHFTITransactionCount } from '@/lib/db';
 import { Badge } from '@/components/ui/badge';
+import { useFocusRefresh } from '@/hooks/useFocusRefresh';
 
 interface PendingCounts {
   hftiRegister: number;
@@ -22,38 +23,32 @@ export const Operations = () => {
     reports: 0
   });
 
-  useEffect(() => {
-    const loadCounts = async () => {
-      const allMemos = await db.memos.toArray();
-      const hftiCount = await getHFTITransactionCount();
-      
-      // New memos not yet printed
-      const newMemos = allMemos.filter(m => m.status === 'New' && !m.printed);
-      
-      // Printed but pending verification
-      const pendingVerify = allMemos.filter(m => m.status === 'Pending');
-      
-      // Memos that need reminders (pending > 15 days old)
-      const today = new Date();
-      const remindersNeeded = allMemos.filter(m => {
-        if (m.status !== 'Pending') return false;
-        const sentDate = m.memo_sent_date ? new Date(m.memo_sent_date) : null;
-        if (!sentDate) return false;
-        const daysSinceSent = Math.floor((today.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
-        return daysSinceSent > 15;
-      });
+  const loadCounts = useCallback(async () => {
+    const allMemos = await db.memos.toArray();
+    const hftiCount = await getHFTITransactionCount();
+    
+    const newMemos = allMemos.filter(m => m.status === 'New' && !m.printed);
+    const pendingVerify = allMemos.filter(m => m.status === 'Pending');
+    
+    const today = new Date();
+    const remindersNeeded = allMemos.filter(m => {
+      if (m.status !== 'Pending') return false;
+      const sentDate = m.memo_sent_date ? new Date(m.memo_sent_date) : null;
+      if (!sentDate) return false;
+      const daysSinceSent = Math.floor((today.getTime() - sentDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysSinceSent > 15;
+    });
 
-      setCounts({
-        hftiRegister: hftiCount,
-        register: newMemos.length,
-        verify: pendingVerify.length,
-        reminders: remindersNeeded.length,
-        reports: 0 // Reports doesn't have pending items
-      });
-    };
-
-    loadCounts();
+    setCounts({
+      hftiRegister: hftiCount,
+      register: newMemos.length,
+      verify: pendingVerify.length,
+      reminders: remindersNeeded.length,
+      reports: 0
+    });
   }, []);
+
+  useFocusRefresh(loadCounts);
 
   const getCountForRoute = (route: string): number => {
     switch (route) {
