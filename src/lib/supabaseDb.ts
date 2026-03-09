@@ -417,15 +417,26 @@ export const getFilteredHFTITransactions = async (filters: {
 
 export const getDebitBOTransactions = async (): Promise<HFTITransactionRecord[]> => {
   const userId = await getUserId();
-  const { data, error } = await supabase
-    .from('hfti_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('debit_credit', 'D');
+  const allData: HFTITransactionRecord[] = [];
+  let from = 0;
+  const pageSize = 1000;
   
-  if (error) throw error;
-  const typedData = (data || []) as unknown as HFTITransactionRecord[];
-  return typedData.filter(t => t.bo_reference && t.bo_reference !== 'Unknown');
+  while (true) {
+    const { data, error } = await supabase
+      .from('hfti_transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('debit_credit', 'D')
+      .range(from, from + pageSize - 1);
+    
+    if (error) throw error;
+    const batch = (data || []) as unknown as HFTITransactionRecord[];
+    allData.push(...batch);
+    if (batch.length < pageSize) break;
+    from += pageSize;
+  }
+  
+  return allData.filter(t => t.bo_reference && t.bo_reference !== 'Unknown');
 };
 
 export const clearHFTITransactions = async (): Promise<void> => {
