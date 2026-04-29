@@ -63,10 +63,15 @@ interface RowGroup {
  * Parse PDF spatial items into Last Balance records.
  * `schemeHint` overrides scheme detection (e.g. from filename).
  */
+export interface ParsedLBRow extends LastBalanceRecord {
+  cif_id?: string;
+  status?: string;
+}
+
 export function parseLastBalancePdfItems(
   allItems: PdfTextItem[],
   schemeHint = "",
-): { records: Omit<LastBalanceRecord, "scheme_type"> & { scheme_type: string }[]; preparedDate: string; scheme: string } {
+): { records: ParsedLBRow[]; preparedDate: string; scheme: string } {
   let scheme = schemeHint;
   let schemeName = SCHEME_NAMES[scheme] || "";
 
@@ -195,7 +200,7 @@ export function parseLastBalancePdfItems(
     /INDIA\s+POST|LAST\s+BALANCE\s+REPORT|PREPARED\s+DATE|TOTAL\s+NO\s+OF|SOL\s+ID|ACCOUNT\s+NUMBER|CUST1\s+NAME|BALANCE\s+AFTER|DATE\s+OF\s+LAST|BO\s+NAME|PAGE\s+\d+\s+OF/i;
 
   // Step 5: parse data rows
-  const records: (Omit<LastBalanceRecord, "scheme_type"> & { scheme_type: string })[] = [];
+  const records: ParsedLBRow[] = [];
   let currentBO = "";
 
   for (let ri = 0; ri < rows.length; ri++) {
@@ -298,10 +303,9 @@ export function parseLastBalancePdfItems(
       balance_date: lastDate || preparedDate || "",
       bo_name: boRaw.replace(/\s+/g, " ").trim(),
       scheme_type: scheme || "",
-      // augment fields available on LastBalanceRecord:
       ...(cifId ? { cif_id: cifId } : {}),
       ...(status ? { status } : {}),
-    } as unknown as Omit<LastBalanceRecord, "scheme_type"> & { scheme_type: string });
+    });
   }
 
   return { records, preparedDate, scheme };
@@ -314,7 +318,7 @@ export function parseLastBalancePdfItems(
  */
 export async function parseLastBalancePdf(
   file: File,
-): Promise<{ records: ReturnType<typeof parseLastBalancePdfItems>["records"]; preparedDate: string; scheme: string }> {
+): Promise<{ records: ParsedLBRow[]; preparedDate: string; scheme: string }> {
   const { items } = await extractPdfData(file);
   const hint = detectSchemeFromFilename(file.name);
   return parseLastBalancePdfItems(items, hint);
