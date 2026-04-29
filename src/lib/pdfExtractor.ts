@@ -17,7 +17,6 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 let workerConfigured = false;
 function ensureWorker() {
   if (workerConfigured) return;
-  // @ts-expect-error pdfjs types lag the runtime API slightly
   pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
   workerConfigured = true;
 }
