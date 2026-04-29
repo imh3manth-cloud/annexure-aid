@@ -18,6 +18,7 @@ import { Operations } from "./pages/Operations";
 import { HFTIRegister } from "./pages/HFTIRegister";
 import { CustomRegisters } from "./pages/CustomRegisters";
 import { CustomRegisterView } from "./pages/CustomRegisterView";
+import { PdfTools } from "./pages/PdfTools";
 import { ResetPassword } from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { useEffect } from "react";
@@ -146,6 +147,13 @@ function AppRoutes() {
         <ProtectedRoute>
           <Layout>
             <CustomRegisterView />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      <Route path="/pdf-tools" element={
+        <ProtectedRoute>
+          <Layout>
+            <PdfTools />
           </Layout>
         </ProtectedRoute>
       } />

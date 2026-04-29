@@ -1,6 +1,6 @@
 import { NavLink } from './NavLink';
 import { ThemeSelector } from './ThemeSelector';
-import { LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, LogOut, FileSpreadsheet } from 'lucide-react';
+import { LayoutDashboard, List, CheckCircle, Bell, BarChart3, Settings, Users, Grid3X3, LogOut, FileSpreadsheet, FileSearch } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getConfig } from '@/lib/config';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -18,6 +18,7 @@ export const menuItems = [
   { to: '/reminders', icon: Bell, label: 'Reminders', description: 'Pending reminders', color: 'from-amber-500 to-amber-600' },
   { to: '/reports', icon: BarChart3, label: 'Reports', description: 'Generate reports', color: 'from-rose-500 to-rose-600' },
   { to: '/custom-registers', icon: FileSpreadsheet, label: 'Custom Registers', description: 'SB-26, Mail Register & more', color: 'from-indigo-500 to-indigo-600' },
+  { to: '/pdf-tools', icon: FileSearch, label: 'PDF Tools & Reports', description: 'Consolidation, unregistered SO, dormancy, weed-out', color: 'from-fuchsia-500 to-fuchsia-600' },
 ];
 
 export const Layout = ({ children }: LayoutProps) => {
