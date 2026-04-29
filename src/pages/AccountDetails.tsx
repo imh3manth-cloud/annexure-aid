@@ -12,6 +12,7 @@ import { BalancePreviewDialog } from '@/components/BalancePreviewDialog';
 import { UploadProgress } from '@/components/UploadProgress';
 import { AccountLookup } from '@/components/AccountLookup';
 import { extractRawCSVData, RawCSVData, LastBalanceRecord } from '@/lib/fileParser';
+import { parseLastBalancePdf } from '@/lib/pdfParsers/lastBalanceReportPdf';
 import {
   saveLastBalanceRecords,
   getLastBalanceCount,
@@ -113,7 +114,34 @@ export const AccountDetails = () => {
 
     try {
       for (const file of balanceFiles) {
-        const rawData = await extractRawCSVData(file);
+        const isPdf = /\.pdf$/i.test(file.name);
+        let rawData: RawCSVData;
+        if (isPdf) {
+          // PDF path — use spatial parser, then synthesise the same RawCSVData
+          // shape the existing preview dialog expects.
+          const { records, preparedDate, scheme } = await parseLastBalancePdf(file);
+          const headers = ['Account', 'Name', 'Address', 'Balance', 'Balance Date', 'BO Name', 'Scheme'];
+          const rows = records.map(r => [
+            r.account, r.name, r.address,
+            String(r.balance ?? 0),
+            r.balance_date || preparedDate || '',
+            r.bo_name || '',
+            r.scheme_type || scheme || '',
+          ]);
+          rawData = {
+            headers,
+            rows,
+            preparedDate: preparedDate || '',
+            headerRowIndex: 0,
+            detectedScheme: scheme || '',
+            autoMapping: {
+              account: 0, name: 1, name2: null, address: 2,
+              balance: 3, scheme_type: 6, status: null, bo_name: 5,
+            },
+          };
+        } else {
+          rawData = await extractRawCSVData(file);
+        }
         const schemeFromFilename = extractSchemeFromFilename(file.name);
         // Prefer scheme detected from file content, fallback to filename
         const schemeFromFile = rawData.detectedScheme || schemeFromFilename;
