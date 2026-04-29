@@ -17,6 +17,7 @@ import {
   getHFTIDateRange
 } from '@/lib/db';
 import { parseHFTIFile, detectBOCode } from '@/lib/fileParser';
+import { parseBrnLongBookPdf } from '@/lib/pdfParsers/brnLongBookPdf';
 import { useToast } from '@/hooks/use-toast';
 
 export const HFTIRegister = () => {
@@ -116,8 +117,12 @@ export const HFTIRegister = () => {
 
     setProcessing(true);
     try {
-      // Parse HFTI file
-      const parsedTransactions = await parseHFTIFile(hftiFile);
+      // Parse HFTI file — supports both Excel/CSV (existing flow) and
+      // CBS BRN Detailed Long Book PDF (new spatial parser).
+      const isPdf = /\.pdf$/i.test(hftiFile.name);
+      const parsedTransactions = isPdf
+        ? (await parseBrnLongBookPdf(hftiFile)).hfti
+        : await parseHFTIFile(hftiFile);
       
       // Transform to HFTI register format
       const hftiRecords = parsedTransactions.map(t => {
@@ -266,7 +271,7 @@ export const HFTIRegister = () => {
                   id="hfti"
                   ref={fileInputRef}
                   type="file"
-                  accept=".xlsx,.xls"
+                accept=".xlsx,.xls,.pdf"
                   onChange={(e) => {
                     setHftiFile(e.target.files?.[0] || null);
                     setLastUploadResult(null);
@@ -276,6 +281,9 @@ export const HFTIRegister = () => {
               </div>
               <p className="text-xs text-muted-foreground">
                 Both debit and credit transactions will be saved with their D/C flag. Duplicates are automatically skipped.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                ✨ New: BRN Detailed Long Book <strong>PDFs</strong> are now supported alongside Excel — the spatial parser extracts each transaction (account, txn ID, date, amount, D/C). Works offline.
               </p>
             </div>
 
