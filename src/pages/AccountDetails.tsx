@@ -394,6 +394,9 @@ export const AccountDetails = () => {
               <p className="text-xs text-muted-foreground">
                 Tip: Name your files with scheme codes (e.g., "LastBal_SSA.csv") to auto-assign schemes to all accounts in that file.
               </p>
+              <p className="text-xs text-muted-foreground">
+                ✨ New: You can now upload CBS Last Balance Report <strong>PDFs</strong> directly — the spatial parser auto-detects scheme &amp; columns. Works offline.
+              </p>
 
               {processing && uploadProgress.total > 0 && (
                 <UploadProgress
