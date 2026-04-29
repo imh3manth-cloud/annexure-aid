@@ -368,7 +368,7 @@ export const AccountDetails = () => {
                 <Input
                   id="balance-upload"
                   type="file"
-                  accept=".csv,.xlsx,.xls"
+                  accept=".csv,.xlsx,.xls,.pdf"
                   multiple
                   onChange={(e) => setBalanceFiles(Array.from(e.target.files || []))}
                 />
